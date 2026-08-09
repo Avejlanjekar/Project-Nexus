@@ -1,29 +1,29 @@
-output "Rds_endpoint" {
+output "RDS_ENDPOINT" {
   value = module.rds.DB_ENDPOINT
 }
 
-output "Databse_name" {
+output "DATABASE_NAME" {
   value = module.rds.DB_NAME
 }
 
-output "Database_port" {
+output "DATABASE_PORT" {
   value = module.rds.DB_PORT
 }
 
 
-output "Alb_dns_name" {
+output "ALB_DNS_NAME" {
   value = module.alb.ALB_DNS_NAME
 }
 
-output "Target_group_arn" {
+output "TARGET_GROUP_ARN" {
   value = module.alb.TARGET_GROUP_ARN
 }
 
 
-output "Instance_id" {
+output "INSTANCE_ID" {
   value = module.ec2.INSTANCE_ID
 }
 
-output "Private_ip" {
+output "PRIVATE_IP" {
   value = module.ec2.PRIVATE_IP
 }

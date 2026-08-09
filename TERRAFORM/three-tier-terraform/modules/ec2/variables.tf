@@ -31,3 +31,25 @@ variable "TARGET_GROUP_PORT" {
   type    = number
   default = 80
 }
+
+
+variable "GITHUB_REPO" {
+  type = string
+}
+
+variable "DB_HOST" {
+  type = string
+}
+
+variable "DB_USER" {
+  type = string
+}
+
+variable "DB_PASSWORD" {
+  type      = string
+  sensitive = true
+}
+
+variable "DB_NAME" {
+  type = string
+}

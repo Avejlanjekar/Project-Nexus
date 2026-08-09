@@ -86,6 +86,12 @@ module "ec2" {
   INSTANCE_NAME     = var.INSTANCE_NAME
   TARGET_GROUP_ARN  = module.alb.TARGET_GROUP_ARN
   TARGET_GROUP_PORT = var.TARGET_GROUP_PORT
+
+  GITHUB_REPO             = var.GITHUB_REPO
+  DB_HOST                 = var.DB_HOST
+  DB_USER                 = var.DB_USER
+  DB_PASSWORD             = var.DB_PASSWORD
+  DB_NAME                 = var.DB_NAME
 }
 
 

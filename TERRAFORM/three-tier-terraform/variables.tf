@@ -202,3 +202,18 @@ variable "ALB_SG_NAME" {
 variable "APP_SG_NAME" {
   type = string
 }
+
+variable "GITHUB_REPO" {
+  type = string
+}
+
+variable "DB_HOST" {
+  type = string
+}
+
+variable "DB_USER" {
+  type = string
+}
+
+
+
