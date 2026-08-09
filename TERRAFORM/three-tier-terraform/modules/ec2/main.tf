@@ -4,7 +4,7 @@ resource "aws_instance" "app" {
   subnet_id              = var.SUBNET_ID
   vpc_security_group_ids = [var.APP_SG_ID]
   key_name               = var.KEY_NAME
-   user_data = templatefile("${path.module}/user_data.sh", {
+  user_data = templatefile("${path.module}/user_data.sh", {
     GITHUB_REPO = var.GITHUB_REPO
     DB_HOST     = var.DB_HOST
     DB_USER     = var.DB_USER
