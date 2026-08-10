@@ -77,15 +77,16 @@ module "keypair" {
 }
 
 module "ec2" {
-  source            = "./modules/ec2"
-  AMI               = data.aws_ami.amazon_linux.id
-  INSTANCE_TYPE     = var.INSTANCE_TYPE
-  SUBNET_ID         = module.networking.PRIVATE_APP_SUBNET_IDS[0]
-  APP_SG_ID         = module.Security_groups.APP_SG_ID
-  KEY_NAME          = module.keypair.KEY_NAME
-  INSTANCE_NAME     = var.INSTANCE_NAME
-  TARGET_GROUP_ARN  = module.alb.TARGET_GROUP_ARN
-  TARGET_GROUP_PORT = var.TARGET_GROUP_PORT
+  source               = "./modules/ec2"
+  AMI                  = data.aws_ami.amazon_linux.id
+  INSTANCE_TYPE        = var.INSTANCE_TYPE
+  SUBNET_ID            = module.networking.PRIVATE_APP_SUBNET_IDS[0]
+  APP_SG_ID            = module.Security_groups.APP_SG_ID
+  KEY_NAME             = module.keypair.KEY_NAME
+  INSTANCE_NAME        = var.INSTANCE_NAME
+  TARGET_GROUP_ARN     = module.alb.TARGET_GROUP_ARN
+  TARGET_GROUP_PORT    = var.TARGET_GROUP_PORT
+  IAM_INSTANCE_PROFILE = module.iam.iam_instance_profile
 
   GITHUB_REPO = var.GITHUB_REPO
   DB_HOST     = var.DB_HOST
@@ -95,3 +96,8 @@ module "ec2" {
 }
 
 
+module "iam" {
+  source                = "./modules/iam"
+  IAM_ROLE_NAME         = var.IAM_ROLE_NAME
+  INSTANCE_PROFILE_NAME = var.INSTANCE_PROFILE_NAME
+}

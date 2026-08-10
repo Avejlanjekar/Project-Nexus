@@ -53,3 +53,7 @@ variable "DB_PASSWORD" {
 variable "DB_NAME" {
   type = string
 }
+
+variable "IAM_INSTANCE_PROFILE" {
+  type = string
+}
