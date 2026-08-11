@@ -27,3 +27,15 @@ output "INSTANCE_ID" {
 output "PRIVATE_IP" {
   value = module.ec2.PRIVATE_IP
 }
+
+output "ALB_SG_ID" {
+  value = module.alb_security_group.security_group_id
+}
+
+output "APP_SG_ID" {
+  value = module.app_security_group.security_group_id
+}
+
+output "DB_SG_ID" {
+  value = module.db_security_group.security_group_id
+}

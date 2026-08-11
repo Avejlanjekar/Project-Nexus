@@ -57,3 +57,7 @@ variable "DB_NAME" {
 variable "IAM_INSTANCE_PROFILE" {
   type = string
 }
+
+variable "APP_COMMON_TAGS" {
+  type = map(string)
+}

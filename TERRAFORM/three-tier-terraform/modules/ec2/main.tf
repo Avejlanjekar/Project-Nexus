@@ -1,4 +1,4 @@
-resource "aws_instance" "app" {
+resource "aws_instance" "this_app" {
   ami                    = var.AMI
   instance_type          = var.INSTANCE_TYPE
   subnet_id              = var.SUBNET_ID
@@ -12,13 +12,13 @@ resource "aws_instance" "app" {
     DB_PASSWORD = var.DB_PASSWORD
     DB_NAME     = var.DB_NAME
   })
-  tags = {
-    Name = var.INSTANCE_NAME
-  }
+  tags = merge(var.APP_COMMON_TAGS,
+    { Name = var.INSTANCE_NAME }
+  )
 }
 
-resource "aws_lb_target_group_attachment" "app" {
+resource "aws_lb_target_group_attachment" "this_app" {
   target_group_arn = var.TARGET_GROUP_ARN
-  target_id        = aws_instance.app.id
+  target_id        = aws_instance.this_app.id
   port             = var.TARGET_GROUP_PORT
 }

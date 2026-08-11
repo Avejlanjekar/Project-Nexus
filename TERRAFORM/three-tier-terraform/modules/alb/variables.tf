@@ -2,6 +2,10 @@ variable "ALB_NAME" {
   type = string
 }
 
+variable "ALB_COMMON_TAGS" {
+  type = map(string)
+}
+
 variable "ALB_INTERNAL" {
   type = bool
 }

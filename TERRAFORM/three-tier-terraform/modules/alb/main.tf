@@ -5,9 +5,10 @@ resource "aws_lb" "this_alb" {
   security_groups            = [var.ALB_SG]
   subnets                    = var.PUBLIC_SUBNET_IDS
   enable_deletion_protection = var.ENABLE_DELETION_PROTECTION
-  tags = {
-    Name = var.ALB_NAME
-  }
+  tags = merge(
+    var.ALB_COMMON_TAGS, {
+      Name = var.ALB_NAME
+  })
 }
 
 resource "aws_lb_target_group" "this_app_lb_tg" {

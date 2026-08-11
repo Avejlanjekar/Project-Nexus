@@ -63,3 +63,7 @@ variable "PRIVATE_ROUTE_CIDR" {
 variable "DATABASE_RT_NAME" {
   type = string
 }
+
+variable "VPC_COMMON_TAGS" {
+  type = map(string)
+}

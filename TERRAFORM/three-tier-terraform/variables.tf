@@ -191,18 +191,6 @@ variable "FILE_PERMISSION" {
   type = number
 }
 
-variable "DB_SG_NAME" {
-  type = string
-}
-
-variable "ALB_SG_NAME" {
-  type = string
-}
-
-variable "APP_SG_NAME" {
-  type = string
-}
-
 variable "GITHUB_REPO" {
   type = string
 }
@@ -221,4 +209,48 @@ variable "IAM_ROLE_NAME" {
 
 variable "INSTANCE_PROFILE_NAME" {
   type = string
+}
+
+
+#sg
+variable "ALB_SG_NAME" {
+  type = string
+}
+
+variable "ALB_SG_PORTS" {
+  type = list(number)
+}
+
+variable "ALB_SG_CIDR_BLOCKS" {
+  type = list(string)
+}
+
+
+variable "APP_SG_NAME" {
+  type = string
+}
+
+variable "APP_SG_PORTS" {
+  type = list(number)
+}
+
+variable "APP_SG_CIDR_BLOCKS" {
+  type = list(string)
+}
+
+
+variable "DB_SG_NAME" {
+  type = string
+}
+
+variable "DB_SG_PORTS" {
+  type = list(number)
+}
+
+variable "DB_SG_CIDR_BLOCKS" {
+  type = list(string)
+}
+
+variable "COMMON_TAGS" {
+  type = map(string)
 }

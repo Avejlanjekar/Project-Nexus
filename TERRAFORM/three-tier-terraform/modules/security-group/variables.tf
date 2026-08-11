@@ -2,14 +2,14 @@ variable "VPC_ID" {
   type = string
 }
 
-variable "ALB_SG_NAME" {
+variable "SG_NAME" {
   type = string
 }
 
-variable "APP_SG_NAME" {
-  type = string
+variable "PORTS" {
+  type = list(number)
 }
 
-variable "DB_SG_NAME" {
-  type = string
+variable "CIDR_BLOCKS" {
+  type = list(string)
 }

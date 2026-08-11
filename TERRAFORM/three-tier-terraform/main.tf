@@ -17,21 +17,23 @@ module "networking" {
   DATABASE_RT_NAME     = var.DATABASE_RT_NAME
   NAT_GATEWAY_NAME     = var.NAT_GATEWAY_NAME
   EIP_NAME             = var.EIP_NAME
+  VPC_COMMON_TAGS      = var.COMMON_TAGS
 }
 
-module "Security_groups" {
-  source      = "./modules/security-group"
+module "alb_security_group" {
+  source = "./modules/security-group"
+
   VPC_ID      = module.networking.VPC_ID
-  DB_SG_NAME  = var.DB_SG_NAME
-  ALB_SG_NAME = var.ALB_SG_NAME
-  APP_SG_NAME = var.APP_SG_NAME
+  SG_NAME     = var.ALB_SG_NAME
+  PORTS       = var.ALB_SG_PORTS
+  CIDR_BLOCKS = var.ALB_SG_CIDR_BLOCKS
 }
 
 module "alb" {
   source                     = "./modules/alb"
   VPC_ID                     = module.networking.VPC_ID
   PUBLIC_SUBNET_IDS          = module.networking.PUBLIC_SUBNET_IDS
-  ALB_SG                     = module.Security_groups.ALB_SG_ID
+  ALB_SG                     = module.alb_security_group.security_group_id
   ALB_NAME                   = var.ALB_NAME
   ALB_INTERNAL               = var.ALB_INTERNAL
   LOAD_BALANCER_TYPE         = var.LOAD_BALANCER_TYPE
@@ -46,13 +48,23 @@ module "alb" {
 
   LISTENER_PORT                = var.LISTENER_PORT
   LISTENER_DEFAULT_ACTION_TYPE = var.LISTENER_DEFAULT_ACTION_TYPE
+  ALB_COMMON_TAGS              = var.COMMON_TAGS
 
+}
+
+module "db_security_group" {
+  source = "./modules/security-group"
+
+  VPC_ID      = module.networking.VPC_ID
+  SG_NAME     = var.DB_SG_NAME
+  PORTS       = var.DB_SG_PORTS
+  CIDR_BLOCKS = var.DB_SG_CIDR_BLOCKS
 }
 
 module "rds" {
   source        = "./modules/rds"
   DB_SUBNET_IDS = module.networking.PRIVATE_DB_SUBNET_IDS
-  DB_SG_ID      = module.Security_groups.DB_SG_ID
+  DB_SG_ID      = module.db_security_group.security_group_id
 
   DB_NAME  = var.DB_NAME
   USERNAME = var.DB_USERNAME
@@ -65,6 +77,7 @@ module "rds" {
   PUBLICLY_ACCESSIBLE  = var.PUBLICLY_ACCESSIBLE
   SKIP_FINAL_SNAPSHOT  = var.SKIP_FINAL_SNAPSHOT
   DB_SUBNET_GROUP_NAME = var.DB_SUBNET_GROUP_NAME
+  DB_COMMON_TAGS       = var.COMMON_TAGS
 }
 
 module "keypair" {
@@ -76,28 +89,37 @@ module "keypair" {
   FILE_PERMISSION = var.FILE_PERMISSION
 }
 
+module "iam" {
+  source                = "./modules/iam"
+  IAM_ROLE_NAME         = var.IAM_ROLE_NAME
+  INSTANCE_PROFILE_NAME = var.INSTANCE_PROFILE_NAME
+}
+
+module "app_security_group" {
+  source = "./modules/security-group"
+
+  VPC_ID      = module.networking.VPC_ID
+  SG_NAME     = var.APP_SG_NAME
+  PORTS       = var.APP_SG_PORTS
+  CIDR_BLOCKS = var.APP_SG_CIDR_BLOCKS
+}
+
 module "ec2" {
   source               = "./modules/ec2"
   AMI                  = data.aws_ami.amazon_linux.id
   INSTANCE_TYPE        = var.INSTANCE_TYPE
   SUBNET_ID            = module.networking.PRIVATE_APP_SUBNET_IDS[0]
-  APP_SG_ID            = module.Security_groups.APP_SG_ID
+  APP_SG_ID            = module.app_security_group.security_group_id
   KEY_NAME             = module.keypair.KEY_NAME
   INSTANCE_NAME        = var.INSTANCE_NAME
   TARGET_GROUP_ARN     = module.alb.TARGET_GROUP_ARN
   TARGET_GROUP_PORT    = var.TARGET_GROUP_PORT
   IAM_INSTANCE_PROFILE = module.iam.iam_instance_profile
 
-  GITHUB_REPO = var.GITHUB_REPO
-  DB_HOST     = var.DB_HOST
-  DB_USER     = var.DB_USER
-  DB_PASSWORD = var.DB_PASSWORD
-  DB_NAME     = var.DB_NAME
-}
-
-
-module "iam" {
-  source                = "./modules/iam"
-  IAM_ROLE_NAME         = var.IAM_ROLE_NAME
-  INSTANCE_PROFILE_NAME = var.INSTANCE_PROFILE_NAME
+  GITHUB_REPO     = var.GITHUB_REPO
+  DB_HOST         = var.DB_HOST
+  DB_USER         = var.DB_USER
+  DB_PASSWORD     = var.DB_PASSWORD
+  DB_NAME         = var.DB_NAME
+  APP_COMMON_TAGS = var.COMMON_TAGS
 }

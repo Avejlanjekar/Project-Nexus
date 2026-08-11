@@ -1,9 +1,9 @@
 resource "aws_db_subnet_group" "this_db_subnet_grp" {
   name       = var.DB_SUBNET_GROUP_NAME
   subnet_ids = var.DB_SUBNET_IDS
-  tags = {
+  tags = merge(var.DB_COMMON_TAGS, {
     Name = var.DB_SUBNET_GROUP_NAME
-  }
+  })
 }
 
 resource "aws_db_instance" "this_rds_db" {
@@ -22,8 +22,8 @@ resource "aws_db_instance" "this_rds_db" {
   publicly_accessible    = var.PUBLICLY_ACCESSIBLE
   skip_final_snapshot    = var.SKIP_FINAL_SNAPSHOT
 
-  tags = {
+  tags = merge(var.DB_COMMON_TAGS, {
     Name = var.IDENTIFIER
-  }
+  })
 }
 

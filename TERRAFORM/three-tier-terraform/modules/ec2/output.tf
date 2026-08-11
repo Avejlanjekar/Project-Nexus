@@ -1,7 +1,7 @@
 output "INSTANCE_ID" {
-  value = aws_instance.app.id
+  value = aws_instance.this_app.id
 }
 
 output "PRIVATE_IP" {
-  value = aws_instance.app.private_ip
+  value = aws_instance.this_app.private_ip
 }

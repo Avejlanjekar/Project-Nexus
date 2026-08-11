@@ -51,3 +51,7 @@ variable "PUBLICLY_ACCESSIBLE" {
 variable "SKIP_FINAL_SNAPSHOT" {
   type = bool
 }
+
+variable "DB_COMMON_TAGS" {
+  type = map(string)
+}
