@@ -21,8 +21,7 @@ module "networking" {
 }
 
 module "alb_security_group" {
-  source = "./modules/security-group"
-
+  source      = "./modules/security-group"
   VPC_ID      = module.networking.VPC_ID
   SG_NAME     = var.ALB_SG_NAME
   PORTS       = var.ALB_SG_PORTS
@@ -30,31 +29,26 @@ module "alb_security_group" {
 }
 
 module "alb" {
-  source                     = "./modules/alb"
-  VPC_ID                     = module.networking.VPC_ID
-  PUBLIC_SUBNET_IDS          = module.networking.PUBLIC_SUBNET_IDS
-  ALB_SG                     = module.alb_security_group.security_group_id
-  ALB_NAME                   = var.ALB_NAME
-  ALB_INTERNAL               = var.ALB_INTERNAL
-  LOAD_BALANCER_TYPE         = var.LOAD_BALANCER_TYPE
-  ENABLE_DELETION_PROTECTION = var.ENABLE_DELETION_PROTECTION
-
-  TG_NAME     = var.TG_NAME
-  ALB_PORT    = var.ALB_PORT
-  PROTOCOL    = var.PROTOCOL
-  TARGET_TYPE = var.TARGET_TYPE
-
-  HEALTH_CHECK_PATH = var.HEALTH_CHECK_PATH
-
+  source                       = "./modules/alb"
+  VPC_ID                       = module.networking.VPC_ID
+  PUBLIC_SUBNET_IDS            = module.networking.PUBLIC_SUBNET_IDS
+  ALB_SG                       = module.alb_security_group.security_group_id
+  ALB_NAME                     = var.ALB_NAME
+  ALB_INTERNAL                 = var.ALB_INTERNAL
+  LOAD_BALANCER_TYPE           = var.LOAD_BALANCER_TYPE
+  ENABLE_DELETION_PROTECTION   = var.ENABLE_DELETION_PROTECTION
+  TG_NAME                      = var.TG_NAME
+  ALB_PORT                     = var.ALB_PORT
+  PROTOCOL                     = var.PROTOCOL
+  TARGET_TYPE                  = var.TARGET_TYPE
+  HEALTH_CHECK_PATH            = var.HEALTH_CHECK_PATH
   LISTENER_PORT                = var.LISTENER_PORT
   LISTENER_DEFAULT_ACTION_TYPE = var.LISTENER_DEFAULT_ACTION_TYPE
   ALB_COMMON_TAGS              = var.COMMON_TAGS
-
 }
 
 module "db_security_group" {
-  source = "./modules/security-group"
-
+  source      = "./modules/security-group"
   VPC_ID      = module.networking.VPC_ID
   SG_NAME     = var.DB_SG_NAME
   PORTS       = var.DB_SG_PORTS
@@ -62,14 +56,12 @@ module "db_security_group" {
 }
 
 module "rds" {
-  source        = "./modules/rds"
-  DB_SUBNET_IDS = module.networking.PRIVATE_DB_SUBNET_IDS
-  DB_SG_ID      = module.db_security_group.security_group_id
-
-  DB_NAME  = var.DB_NAME
-  USERNAME = var.DB_USERNAME
-  PASSWORD = var.DB_PASSWORD
-
+  source               = "./modules/rds"
+  DB_SUBNET_IDS        = module.networking.PRIVATE_DB_SUBNET_IDS
+  DB_SG_ID             = module.db_security_group.security_group_id
+  DB_NAME              = var.DB_NAME
+  USERNAME             = var.DB_USERNAME
+  PASSWORD             = var.DB_PASSWORD
   ENGINE               = var.ENGINE
   ENGINE_VERSION       = var.ENGINE_VERSION
   INSTANCE_CLASS       = var.INSTANCE_CLASS
@@ -96,8 +88,7 @@ module "iam" {
 }
 
 module "app_security_group" {
-  source = "./modules/security-group"
-
+  source      = "./modules/security-group"
   VPC_ID      = module.networking.VPC_ID
   SG_NAME     = var.APP_SG_NAME
   PORTS       = var.APP_SG_PORTS
@@ -115,11 +106,10 @@ module "ec2" {
   TARGET_GROUP_ARN     = module.alb.TARGET_GROUP_ARN
   TARGET_GROUP_PORT    = var.TARGET_GROUP_PORT
   IAM_INSTANCE_PROFILE = module.iam.iam_instance_profile
-
-  GITHUB_REPO     = var.GITHUB_REPO
-  DB_HOST         = var.DB_HOST
-  DB_USER         = var.DB_USER
-  DB_PASSWORD     = var.DB_PASSWORD
-  DB_NAME         = var.DB_NAME
-  APP_COMMON_TAGS = var.COMMON_TAGS
+  GITHUB_REPO          = var.GITHUB_REPO
+  DB_HOST              = var.DB_HOST
+  DB_USER              = var.DB_USER
+  DB_PASSWORD          = var.DB_PASSWORD
+  DB_NAME              = var.DB_NAME
+  APP_COMMON_TAGS      = var.COMMON_TAGS
 }

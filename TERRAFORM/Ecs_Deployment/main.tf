@@ -20,53 +20,42 @@ module "networking" {
 }
 
 module "db_security_group" {
-  source = "./modules/security-group"
-
+  source              = "./modules/security-group"
   VPC_ID              = module.networking.VPC_ID
   SG_NAME             = var.DB_SG_NAME
   INGRESS_PORTS       = var.DB_INGRESS_PORTS
   INGRESS_CIDR_BLOCKS = var.DB_INGRESS_CIDR_BLOCKS
-
-  EGRESS_PORTS       = var.DB_EGRESS_PORTS
-  EGRESS_CIDR_BLOCKS = var.DB_EGRESS_CIDR_BLOCKS
+  EGRESS_PORTS        = var.DB_EGRESS_PORTS
+  EGRESS_CIDR_BLOCKS  = var.DB_EGRESS_CIDR_BLOCKS
 }
 
 module "backend_security_group" {
-  source = "./modules/security-group"
-
-  VPC_ID = module.networking.VPC_ID
-
-  SG_NAME = var.BACKEND_SG_NAME
-
+  source              = "./modules/security-group"
+  VPC_ID              = module.networking.VPC_ID
+  SG_NAME             = var.BACKEND_SG_NAME
   INGRESS_PORTS       = var.BACKEND_INGRESS_PORTS
   INGRESS_CIDR_BLOCKS = var.BACKEND_INGRESS_CIDR_BLOCKS
-
-  EGRESS_PORTS       = var.BACKEND_EGRESS_PORTS
-  EGRESS_CIDR_BLOCKS = var.BACKEND_EGRESS_CIDR_BLOCKS
+  EGRESS_PORTS        = var.BACKEND_EGRESS_PORTS
+  EGRESS_CIDR_BLOCKS  = var.BACKEND_EGRESS_CIDR_BLOCKS
 }
 
 module "frontend_security_group" {
-  source = "./modules/security-group"
-
-  VPC_ID  = module.networking.VPC_ID
-  SG_NAME = var.FRONTEND_SG_NAME
-
+  source              = "./modules/security-group"
+  VPC_ID              = module.networking.VPC_ID
+  SG_NAME             = var.FRONTEND_SG_NAME
   INGRESS_PORTS       = var.FRONTEND_INGRESS_PORTS
   INGRESS_CIDR_BLOCKS = var.FRONTEND_INGRESS_CIDR_BLOCKS
-
-  EGRESS_PORTS       = var.FRONTEND_EGRESS_PORTS
-  EGRESS_CIDR_BLOCKS = var.FRONTEND_EGRESS_CIDR_BLOCKS
+  EGRESS_PORTS        = var.FRONTEND_EGRESS_PORTS
+  EGRESS_CIDR_BLOCKS  = var.FRONTEND_EGRESS_CIDR_BLOCKS
 }
 
 module "rds" {
-  source        = "./modules/rds"
-  DB_SUBNET_IDS = module.networking.PRIVATE_DB_SUBNET_IDS
-  DB_SG_ID      = module.db_security_group.security_group_id
-
-  DB_NAME  = var.DB_NAME
-  USERNAME = var.DB_USERNAME
-  PASSWORD = var.DB_PASSWORD
-
+  source               = "./modules/rds"
+  DB_SUBNET_IDS        = module.networking.PRIVATE_DB_SUBNET_IDS
+  DB_SG_ID             = module.db_security_group.security_group_id
+  DB_NAME              = var.DB_NAME
+  USERNAME             = var.DB_USERNAME
+  PASSWORD             = var.DB_PASSWORD
   ENGINE               = var.ENGINE
   ENGINE_VERSION       = var.ENGINE_VERSION
   INSTANCE_CLASS       = var.INSTANCE_CLASS
@@ -78,8 +67,7 @@ module "rds" {
 }
 
 module "alb_security_group" {
-  source = "./modules/security-group"
-
+  source              = "./modules/security-group"
   VPC_ID              = module.networking.VPC_ID
   SG_NAME             = var.ALB_SG_NAME
   INGRESS_PORTS       = var.ALB_INGRESS_PORTS
@@ -89,32 +77,24 @@ module "alb_security_group" {
 }
 
 module "alb" {
-  source = "./modules/alb"
-
-  VPC_ID            = module.networking.VPC_ID
-  PUBLIC_SUBNET_IDS = module.networking.PUBLIC_SUBNET_IDS
-  ALB_SG            = module.alb_security_group.security_group_id
-
-  ALB_NAME                   = var.ALB_NAME
-  ALB_INTERNAL               = var.ALB_INTERNAL
-  LOAD_BALANCER_TYPE         = var.LOAD_BALANCER_TYPE
-  ENABLE_DELETION_PROTECTION = var.ENABLE_DELETION_PROTECTION
-
-  TARGET_GROUPS = var.TARGET_GROUPS
-
-  PROTOCOL = var.PROTOCOL
-
-  LISTENER_PORT                = var.LISTENER_PORT
-  LISTENER_DEFAULT_ACTION_TYPE = var.LISTENER_DEFAULT_ACTION_TYPE
-
+  source                         = "./modules/alb"
+  VPC_ID                         = module.networking.VPC_ID
+  PUBLIC_SUBNET_IDS              = module.networking.PUBLIC_SUBNET_IDS
+  ALB_SG                         = module.alb_security_group.security_group_id
+  ALB_NAME                       = var.ALB_NAME
+  ALB_INTERNAL                   = var.ALB_INTERNAL
+  LOAD_BALANCER_TYPE             = var.LOAD_BALANCER_TYPE
+  ENABLE_DELETION_PROTECTION     = var.ENABLE_DELETION_PROTECTION
+  TARGET_GROUPS                  = var.TARGET_GROUPS
+  PROTOCOL                       = var.PROTOCOL
+  LISTENER_PORT                  = var.LISTENER_PORT
+  LISTENER_DEFAULT_ACTION_TYPE   = var.LISTENER_DEFAULT_ACTION_TYPE
   DEFAULT_TARGET_GROUP           = var.DEFAULT_TARGET_GROUP
   BACKEND_LISTENER_RULE_PRIORITY = var.BACKEND_LISTENER_RULE_PRIORITY
   LISTENER_RULE_ACTION_TYPE      = var.LISTENER_RULE_ACTION_TYPE
   LISTENER_RULE_TARGET_GROUP     = var.LISTENER_RULE_TARGET_GROUP
   LISTENER_RULE_PATH_PATTERNS    = var.LISTENER_RULE_PATH_PATTERNS
-
-
-  ALB_COMMON_TAGS = var.COMMON_TAGS
+  ALB_COMMON_TAGS                = var.COMMON_TAGS
 }
 
 module "frontend_ecr" {
@@ -160,21 +140,16 @@ module "frontend_cloudwatch" {
 }
 
 module "backend_task_definition" {
-  source = "./modules/task-definition"
-
+  source                   = "./modules/task-definition"
   TASK_FAMILY              = var.BACKEND_TASK_FAMILY
   NETWORK_MODE             = var.NETWORK_MODE
   REQUIRES_COMPATIBILITIES = var.REQUIRES_COMPATIBILITIES
-
-  CPU    = var.BACKEND_CPU
-  MEMORY = var.BACKEND_MEMORY
-
-  EXECUTION_ROLE_ARN = module.iam.ecs_task_execution_role_arn
-
-  CONTAINER_NAME  = var.BACKEND_CONTAINER_NAME
-  CONTAINER_IMAGE = "${module.backend_ecr.Repository_url}:latest"
-  CONTAINER_PORT  = var.BACKEND_CONTAINER_PORT
-
+  CPU                      = var.BACKEND_CPU
+  MEMORY                   = var.BACKEND_MEMORY
+  EXECUTION_ROLE_ARN       = module.iam.ecs_task_execution_role_arn
+  CONTAINER_NAME           = var.BACKEND_CONTAINER_NAME
+  CONTAINER_IMAGE          = "${module.backend_ecr.Repository_url}:latest"
+  CONTAINER_PORT           = var.BACKEND_CONTAINER_PORT
   ENVIRONMENT_VARIABLES = concat(
     var.BACKEND_ENVIRONMENT_VARIABLES,
     [
@@ -184,7 +159,6 @@ module "backend_task_definition" {
       }
     ]
   )
-
   LOG_GROUP_NAME = module.backend_cloudwatch.log_group_name
   REGION         = var.REGION
   TAGS           = var.COMMON_TAGS
@@ -192,80 +166,54 @@ module "backend_task_definition" {
 }
 
 module "frontend_task_definition" {
-  source = "./modules/task-definition"
-
+  source                   = "./modules/task-definition"
   TASK_FAMILY              = var.FRONTEND_TASK_FAMILY
   NETWORK_MODE             = var.NETWORK_MODE
   REQUIRES_COMPATIBILITIES = var.REQUIRES_COMPATIBILITIES
-
-  CPU    = var.FRONTEND_CPU
-  MEMORY = var.FRONTEND_MEMORY
-
-  EXECUTION_ROLE_ARN = module.iam.ecs_task_execution_role_arn
-
-  CONTAINER_NAME  = var.FRONTEND_CONTAINER_NAME
-  CONTAINER_IMAGE = "${module.frontend_ecr.Repository_url}:latest"
-  CONTAINER_PORT  = var.FRONTEND_CONTAINER_PORT
-
-  ENVIRONMENT_VARIABLES = []
-
-  LOG_GROUP_NAME = module.frontend_cloudwatch.log_group_name
-  REGION         = var.REGION
-  TAGS           = var.COMMON_TAGS
-  ESSENTIAL      = var.ESSENTIAL
+  CPU                      = var.FRONTEND_CPU
+  MEMORY                   = var.FRONTEND_MEMORY
+  EXECUTION_ROLE_ARN       = module.iam.ecs_task_execution_role_arn
+  CONTAINER_NAME           = var.FRONTEND_CONTAINER_NAME
+  CONTAINER_IMAGE          = "${module.frontend_ecr.Repository_url}:latest"
+  CONTAINER_PORT           = var.FRONTEND_CONTAINER_PORT
+  ENVIRONMENT_VARIABLES    = []
+  LOG_GROUP_NAME           = module.frontend_cloudwatch.log_group_name
+  REGION                   = var.REGION
+  TAGS                     = var.COMMON_TAGS
+  ESSENTIAL                = var.ESSENTIAL
 }
 
 module "backend_ecs_service" {
-  source = "./modules/ecs-service"
-
-  SERVICE_NAME = var.BACKEND_SERVICE_NAME
-
-  CLUSTER_ARN = module.ecs_cluster.cluster_arn
-
+  source              = "./modules/ecs-service"
+  SERVICE_NAME        = var.BACKEND_SERVICE_NAME
+  CLUSTER_ARN         = module.ecs_cluster.cluster_arn
   TASK_DEFINITION_ARN = module.backend_task_definition.TASK_DEFINITION_ARN
-
-  DESIRED_COUNT = var.BACKEND_DESIRED_COUNT
-
-  SUBNET_IDS = module.networking.PRIVATE_APP_SUBNET_IDS
-
+  DESIRED_COUNT       = var.BACKEND_DESIRED_COUNT
+  SUBNET_IDS          = module.networking.PRIVATE_APP_SUBNET_IDS
   SECURITY_GROUP_IDS = [
     module.backend_security_group.security_group_id
   ]
-
   ASSIGN_PUBLIC_IP = var.BACKEND_ASSIGN_PUBLIC_IP
-
   TARGET_GROUP_ARN = module.alb.TARGET_GROUP_ARNS["backend"]
-
-  CONTAINER_NAME = var.BACKEND_CONTAINER_NAME
-  CONTAINER_PORT = var.BACKEND_CONTAINER_PORT
-
-  TAGS = var.COMMON_TAGS
+  CONTAINER_NAME   = var.BACKEND_CONTAINER_NAME
+  CONTAINER_PORT   = var.BACKEND_CONTAINER_PORT
+  TAGS             = var.COMMON_TAGS
 }
 
 
 module "frontend_ecs_service" {
-  source = "./modules/ecs-service"
-
-  SERVICE_NAME = var.FRONTEND_SERVICE_NAME
-
-  CLUSTER_ARN = module.ecs_cluster.cluster_arn
-
+  source              = "./modules/ecs-service"
+  SERVICE_NAME        = var.FRONTEND_SERVICE_NAME
+  CLUSTER_ARN         = module.ecs_cluster.cluster_arn
   TASK_DEFINITION_ARN = module.frontend_task_definition.TASK_DEFINITION_ARN
-
-  DESIRED_COUNT = var.FRONTEND_DESIRED_COUNT
-
-  SUBNET_IDS = module.networking.PRIVATE_APP_SUBNET_IDS
-
+  DESIRED_COUNT       = var.FRONTEND_DESIRED_COUNT
+  SUBNET_IDS          = module.networking.PRIVATE_APP_SUBNET_IDS
   SECURITY_GROUP_IDS = [
     module.frontend_security_group.security_group_id
   ]
-
   ASSIGN_PUBLIC_IP = var.FRONTEND_ASSIGN_PUBLIC_IP
-
   TARGET_GROUP_ARN = module.alb.TARGET_GROUP_ARNS["frontend"]
-
-  CONTAINER_NAME = var.FRONTEND_CONTAINER_NAME
-  CONTAINER_PORT = var.FRONTEND_CONTAINER_PORT
-
-  TAGS = var.COMMON_TAGS
+  CONTAINER_NAME   = var.FRONTEND_CONTAINER_NAME
+  CONTAINER_PORT   = var.FRONTEND_CONTAINER_PORT
+  TAGS             = var.COMMON_TAGS
 }

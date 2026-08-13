@@ -26,8 +26,6 @@ variable "ENABLE_DELETION_PROTECTION" {
   type = bool
 }
 
-
-
 variable "PROTOCOL" {
   type = string
 }
@@ -53,7 +51,6 @@ variable "TARGET_GROUPS" {
     health_check_path = string
   }))
 }
-
 
 variable "DEFAULT_TARGET_GROUP" {
   type = string

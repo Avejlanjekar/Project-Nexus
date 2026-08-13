@@ -17,21 +17,13 @@ EIP_NAME                 = "nat-eip"
 NAT_GATEWAY_NAME         = "three_tier_nat"
 
 # # ALB & Target Group
-
-ALB_NAME = "employee-frontend-alb"
-
-ALB_INTERNAL = false
-
-LOAD_BALANCER_TYPE = "application"
-
-ENABLE_DELETION_PROTECTION = false
-
-PROTOCOL = "HTTP"
-
-LISTENER_PORT = 80
-
+ALB_NAME                     = "employee-frontend-alb"
+ALB_INTERNAL                 = false
+LOAD_BALANCER_TYPE           = "application"
+ENABLE_DELETION_PROTECTION   = false
+PROTOCOL                     = "HTTP"
+LISTENER_PORT                = 80
 LISTENER_DEFAULT_ACTION_TYPE = "forward"
-
 
 # RDS
 DB_NAME              = "cloudethix"
@@ -46,16 +38,12 @@ PUBLICLY_ACCESSIBLE  = false
 DB_SUBNET_GROUP_NAME = "three-tier-db-subnet-group"
 
 # #sg
-ALB_SG_NAME = "employee-alb-sg"
-
+ALB_SG_NAME       = "employee-alb-sg"
 ALB_INGRESS_PORTS = [80]
-
 ALB_INGRESS_CIDR_BLOCKS = [
   "0.0.0.0/0"
 ]
-
 ALB_EGRESS_PORTS = [80, 5000]
-
 ALB_EGRESS_CIDR_BLOCKS = [
   "10.0.0.0/16"
 ]
@@ -95,7 +83,6 @@ COMMON_TAGS = {
   Owner       = "DevOps-Team"
   ManagedBy   = "Terraform"
 }
-
 
 FRONTEND_ECR_NAME = "employee-frontend"
 
@@ -149,7 +136,6 @@ BACKEND_ENVIRONMENT_VARIABLES = [
 ]
 DB_HOST   = "DB_HOST"
 ESSENTIAL = true
-
 
 BACKEND_SERVICE_NAME     = "employee-backend-service"
 BACKEND_DESIRED_COUNT    = 1

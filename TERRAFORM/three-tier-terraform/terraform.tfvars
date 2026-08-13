@@ -57,23 +57,17 @@ IAM_ROLE_NAME         = "EC2-SSM-ROLE"
 INSTANCE_PROFILE_NAME = "EC2-SSM-PROFILE"
 
 GITHUB_REPO = "https://github.com/Avejlanjekar/Employee_management_system.git"
-
-DB_HOST = "three-tier-db.c9e08egmmmsp.ap-south-1.rds.amazonaws.com"
-
-DB_USER = "Avej"
-
-
+DB_HOST     = "three-tier-db.c9e08egmmmsp.ap-south-1.rds.amazonaws.com"
+DB_USER     = "Avej"
 
 #sg
 ALB_SG_NAME        = "alb-sg"
 ALB_SG_PORTS       = [80, 443]
 ALB_SG_CIDR_BLOCKS = ["0.0.0.0/0"]
 
-
 APP_SG_NAME        = "application-sg"
 APP_SG_PORTS       = [80]
 APP_SG_CIDR_BLOCKS = ["10.0.0.0/16"]
-
 
 DB_SG_NAME        = "database-sg"
 DB_SG_PORTS       = [3306]
