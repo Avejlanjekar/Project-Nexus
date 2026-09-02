@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudethix-pod
+  namespace: cloudethix-avej
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloudethix
+  template:
+    metadata:
+      labels:
+        app: cloudethix
+    spec:
+      containers:
+        - name: cloudethix
+          image: avejlanjekar45/cloudethix-nginix-avej
+          ports:
+            - containerPort: 80
