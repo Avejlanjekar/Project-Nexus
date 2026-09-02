@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: envfrom-pod
+spec:
+  containers:
+  - name: envfrom-cont
+    image: busybox:1.36
+    command: ["/bin/sh","-c","env"]
+    envFrom:
+    - configMapRef:
+        name: special-config01 

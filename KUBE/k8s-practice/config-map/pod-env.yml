@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-env-pod
+spec:
+  containers:
+  - name: configmap-env-cont
+    image: busybox:1.36
+    command: ["/bin/sh","-c","env"]
+    env:
+      - name: SPECIAL_LEVEL_KEY
+        valueFrom:
+          configMapKeyRef:
+            name: special-config
+            key: special.how
+
+      - name: LOG_LEVEL
+        valueFrom:
+          configMapKeyRef:
+            name: env-config
+            key: log_level 
