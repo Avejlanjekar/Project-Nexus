@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sa-no-mount-test
+  namespace: ns-1
+spec:
+  serviceAccountName: app-sa-no-mount
+  containers:
+    - name: sa-no-mount-test
+      image: avejlanjekar45/toolbox:1.0
+
