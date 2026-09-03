@@ -1,0 +1,2699 @@
+
+==================================================================================================================================================================
+POC1 :- ConfigMap: Volume Mount + Env Var Reference
+1 Create ConfigMap app-config with keys: APP_ENV=production, APP_NAME=inventory-service.
+2 Create pod config-inspector (toolbox image), that:
+3 mounts app-config as a volume at /etc/app/config also injects APP_ENV as an environment variable via configMapKeyRef
+3 Verify:
+- kubectl exec config-inspector -- cat /etc/app/config/APP_ENV
+- kubectl exec config-inspector -- printenv APP_ENV
+
+Expected result: /etc/app/config/APP_ENV contains production. /etc/app/config/APP_NAME also exists and contains inventory-service (mounted as a whole ConfigMap, both keys appear as files). printenv APP_ENV returns production. Only APP_ENV exists as an env var — APP_NAME does not, since it was never referenced with configMapKeyRef.
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc1$ ls
+config-inspector-pod.yml  config-map.yml
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc1$ cat config-map.yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: ns-1
+data:
+  APP_ENV: production
+  APP_NAME: inventory-service
+  
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc1$ cat config-inspector-pod.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: config-inspector
+  namespace: ns-1
+spec:
+  containers:
+    - name: config-inspector
+      image: avejlanjekar45/toolbox:1.0
+      env:
+        - name: APP_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: APP_ENV
+      volumeMounts:
+        - name: app-config-volume
+          mountPath: /etc/app/config
+  volumes:
+    - name: app-config-volume
+      configMap:
+        name: app-config
+		
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc1$ kubectl exec config-inspector -- cat /etc/app/config/APP_ENV
+production
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc1$ kubectl exec config-inspector -- printenv APP_ENV
+production
+==================================================================================================================================================
+
+POC 2:- ConfigMap: Mounting a Single Key (subPath)
+1 Reuse ConfigMap app-config from POC 1.
+2 Create pod config-subpath (toolbox image) that mounts only the APP_NAME key from app-config to the path /etc/app/name.txt, using subPath.
+3 Verify: kubectl exec config-subpath -- cat /etc/app/name.txt and kubectl exec config-subpath -- ls /etc/app.
+
+Expected result: /etc/app/name.txt contains inventory-service. ls /etc/app shows only name.txt — APP_ENV is not present anywhere in the pod, confirming subPath mounts a single key instead of the whole ConfigMap.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc2$ kubectl get cm
+NAME               DATA   AGE
+app-config         2      18m
+kube-root-ca.crt   1      18m
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc2$ cat config-subpath-pod.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: config-subpath
+  namespace: ns-1
+spec:
+  containers:
+    - name: config-subpath
+      image: avejlanjekar45/toolbox:1.0
+      volumeMounts:
+        - name: config-subpath-volume
+          subPath: APP_NAME
+          mountPath: /etc/app/name.txt
+  volumes:
+    - name: config-subpath-volume
+      configMap:
+        name: app-config
+		
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc2$ kubectl exec config-subpath -- cat /etc/app/name.txt
+inventory-service
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc2$ kubectl exec config-subpath -- ls /etc/app
+name.txt
+=============================================================================================================================================================
+POC 3: Secret: Volume Mount + Env Var Reference
+1 Create Secret db-credentials with keys username and password.
+2 Create pod secret-inspector (toolbox image), that:
+3 mounts db-credentials as a volume at /etc/app/secrets
+4 injects username as env var DB_USERNAME via secretKeyRef
+5 Verify:
+- kubectl exec secret-inspector -- cat /etc/app/secrets/username
+- kubectl exec secret-inspector -- cat /etc/app/secrets/password
+- kubectl exec secret-inspector -- printenv DB_USERNAME
+- kubectl exec secret-inspector -- ls -l /etc/app/secrets
+
+Expected result: Both username and password appear as files under /etc/app/secrets with their decoded (plaintext) values. printenv DB_USERNAME returns the username value. ls -l shows the Secret volume mounted with restrictive file permissions (0644 by default, root-owned) and backed by tmpfs rather than disk.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc3$ ls
+secret-inspector-pod.yml  secrets.yml
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc3$ cat secret-inspector-pod.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secret-inspector
+  namespace: ns-1
+spec:
+  containers:
+    - name: secret-inspector
+      image: avejlanjekar45/toolbox:1.0
+      env:
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: username
+      volumeMounts:
+        - name: db-credential-volume
+          mountPath: /etc/app/secrets
+  volumes:
+    - name: db-credential-volume
+      secret:
+        secretName: db-credentials
+		
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc3$ cat secrets.yml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-credentials
+  namespace: ns-1
+data:
+  username: QXZlago=
+  password: bGFuamVrYXIK
+  
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc3$ kubectl exec secret-inspector -- cat /etc/app/secrets/username
+Avej
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc3$ kubectl exec secret-inspector -- cat /etc/app/secrets/password
+lanjekar
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc3$ kubectl exec secret-inspector -- printenv DB_USERNAME
+Avej
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc3$ kubectl exec secret-inspector -- ls -l /etc/app/secrets
+total 0
+lrwxrwxrwx    1 root     root            15 Sep  1 06:01 password -> ..data/password
+
+=======================================================================================================================================================================
+POC 4 — Secret: Mounting a Single Key with Custom Permissions
+1 Reuse Secret db-credentials.
+2 Create pod secret-subpath (toolbox image) that mounts only the password key to /etc/app/secret-password, using subPath, with defaultMode: 0400.
+3 Verify: kubectl exec secret-subpath -- cat /etc/app/secret-password and kubectl exec secret-subpath -- ls -l /etc/app/secret-password.
+
+Expected result: File contains the password value only; username is not present in the pod at all. File permission mode shows 0400 (read-only for owner), confirming defaultMode was applied.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc4$ kubectl get secrets
+NAME             TYPE     DATA   AGE
+db-credentials   Opaque   2      17m
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc4$ ls
+secret-subpath-pod.yml
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc4$ cat secret-subpath-pod.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secret-subpath
+  namespace: ns-1
+spec:
+  containers:
+    - name: secret-subpath
+      image: avejlanjekar45/toolbox:1.0
+      volumeMounts:
+        - name: secret-subpath-volume
+          mountPath: /etc/app/secret-password
+          subPath: password
+  volumes:
+    - name: secret-subpath-volume
+      secret:
+        secretName: db-credentials
+        defaultMode: 0400
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc4$ kubectl exec secret-subpath -- cat /etc/app/secret-password
+lanjekar
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc4$ kubectl exec secret-subpath -- cat /etc/app/secret-password
+lanjekar
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc4$ kubectl exec secret-subpath -- ls -l /etc/app/secret-password
+-r--------    1 root     root             9 Sep  1 06:12 /etc/app/secret-password
+===========================================================================================================================================================================
+
+POC 5 — ServiceAccount: Assignment + Auto-Mounted Volume
+1 Create ServiceAccount app-sa.
+2 Create pod sa-test (toolbox image) with serviceAccountName: app-sa.
+3 Verify:
+- kubectl get pod sa-test -o jsonpath='{.spec.serviceAccountName}'
+- kubectl exec sa-test -- ls /var/run/secrets/kubernetes.io/serviceaccount
+- kubectl exec sa-test -- cat /var/run/secrets/kubernetes.io/serviceaccount/namespace
+
+Expected result: spec.serviceAccountName returns app-sa. Without any explicit volume defined in the pod spec, /var/run/secrets/kubernetes.io/serviceaccount contains three auto-projected files: token, ca.crt, and namespace. The namespace file contains the pod's actual namespace — confirming Kubernetes injects this volume automatically for every ServiceAccount.
+----------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc5$ cat service-account.yml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-sa
+  namespace: ns-1
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc5$ cat sa-test-pod.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sa-test
+  namespace: ns-1
+spec:
+  serviceAccountName: app-sa
+  containers:
+    - name: sa-test
+      image: avejlanjekar45/toolbox:1.0
+  
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc5$ kubectl get sa
+NAME      AGE
+app-sa    2s
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc5$ kubectl get pod sa-test -o jsonpath='{.spec.serviceAccountName}'
+app-sa
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc5$ kubectl exec sa-test -- ls /var/run/secrets/kubernetes.io/serviceaccount
+ca.crt
+namespace
+token
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc5$ kubectl exec sa-test -- cat /var/run/secrets/kubernetes.io/serviceaccount/namespace
+ns-1
+
+============================================================================================================================================================================
+POC 6 — ServiceAccount: Disabling Auto-Mount
+1 Create ServiceAccount app-sa-no-mount with automountServiceAccountToken: false.
+2 Create pod sa-no-mount-test (toolbox image) using that ServiceAccount.
+3 Verify: kubectl exec sa-no-mount-test -- ls /var/run/secrets/kubernetes.io/serviceaccount.
+
+Expected result: The command fails with "No such file or directory" — no token volume is mounted, confirming automountServiceAccountToken: false on the ServiceAccount (or on the pod spec) suppresses the default auto-mount behavior.
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc6$ ls
+sa-no-mount-test-pod.yml  service-account.yml
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc6$ cat service-account.yml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-sa-no-mount
+  namespace: ns-1
+automountServiceAccountToken: false
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc6$ cat sa-no-mount-test-pod.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sa-no-mount-test
+  namespace: ns-1
+spec:
+  serviceAccountName: app-sa-no-mount
+  containers:
+    - name: sa-no-mount-test
+      image: avejlanjekar45/toolbox:1.0
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc6$ kubectl get sa
+NAME              AGE
+app-sa            18m
+app-sa-no-mount   4m29s
+default           76m
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc6$ kubectl exec sa-no-mount-test -- ls /var/run/secrets/kubernetes.io/serviceaccount
+ls: /var/run/secrets/kubernetes.io/serviceaccount: No such file or directory
+command terminated with exit code 1
+
+=======================================================================================================================================================================
+
+POC 7 — PV + PVC: Persistence Across Pod Recreation
+
+1 Create a 1Gi PersistentVolume (hostPath is fine for a local cluster).
+2 Create a PVC that binds to it.
+3 Create pod pvc-test (toolbox image), mounting the PVC at /data.
+4 kubectl exec pvc-test -- sh -c 'echo hello-from-poc7 > /data/hello.txt'
+5 Delete pod pvc-test. Recreate it with the same PVC.
+6 kubectl exec pvc-test -- cat /data/hello.txt
+
+Expected result: /data/hello.txt still contains hello-from-poc7 after the pod is recreated. kubectl get pvc shows the claim remains Bound throughout, confirming PV/PVC lifecycle is independent of the pod lifecycle.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc7/nfs-volume-storage$ cat pvc.yml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-data
+  namespace: ns-1
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-csi
+  resources:
+    requests:
+      storage: 1Gi
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc7/nfs-volume-storage$ kubectl get pvc
+NAME          STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+shared-data   Bound    pvc-623863e6-6dcc-404b-921a-729f207d1b86   1Gi        RWX            nfs-csi        <unset>                 95s
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc7$ cat pvc-test-pod.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pvc-test
+  namespace: ns-1
+spec:
+  containers:
+    - name: pvc-test
+      image: avejlanjekar45/toolbox:1.0
+      volumeMounts:
+        - name: pvc-storage
+          mountPath: /data
+  volumes:
+    - name: pvc-storage
+      persistentVolumeClaim:
+        claimName: shared-data
+		
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc7$ kubectl exec pvc-test -- sh -c 'echo hello-from-poc7 > /data/hello.txt'
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc7$
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc7$ kubectl delete pod pvc-test
+pod "pvc-test" deleted from ns-1 namespace
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc7$ kubectl apply -f pvc-test-pod.yml
+pod/pvc-test created
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc7$ kubectl exec pvc-test -- cat /data/hello.txt
+hello-from-poc7
+
+===========================================================================================================================================================================
+POC 8:- Two Pods Sharing One PVC
+1 Reuse (or create another) PVC.
+2 Create pod-a and pod-b (both toolbox image), mounting the same PVC at /data.
+3 pod-a: kubectl exec pod-a -- sh -c 'echo shared-data > /data/test.txt'
+4 pod-b: kubectl exec pod-b -- cat /data/test.txt
+
+Expected result: If both pods land on the same node and the PV is ReadWriteOnce, pod-b successfully reads shared-data — RWO restricts the volume to a single node, not a single pod, so co-located pods can share it. If the scheduler places pod-b on a different node, the mount fails or the pod stays stuck in ContainerCreating, since an RWO volume can't attach to two nodes at once. A ReadWriteMany PV (e.g. NFS-backed) would succeed regardless of node placement.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc8$ cat pod-a.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-a
+  namespace: ns-1
+spec:
+  containers:
+    - name: pod-a
+      image: avejlanjekar45/toolbox:1.0
+      volumeMounts:
+        - name: pv-storage
+          mountPath: /data
+  volumes:
+    - name: pv-storage
+      persistentVolumeClaim:
+        claimName: shared-data
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc8$ cat pod-b.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-b
+  namespace: ns-1
+spec:
+  containers:
+    - name: pod-b
+      image: avejlanjekar45/toolbox:1.0
+      volumeMounts:
+        - name: pv-storage
+          mountPath: /data
+  volumes:
+    - name: pv-storage
+      persistentVolumeClaim:
+        claimName: shared-data
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc8$ kubectl exec pod-a -- sh -c 'echo shared-data > /data/test.txt'
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc8$ kubectl exec pod-b -- cat /data/test.txt
+shared-data
+
+
+
+===============================================================================================================================================================
+
+Poc 9:- Pod-to-Pod Communication via Service (order-service → inventory-service)
+1 Create pod inventory-service using your pushed inventory-service image (from Image 2 above), that mounts ConfigMap app-config (from POC 1) as a volume at /etc/app/config, container port 5678.
+2 Create a ClusterIP Service named inventory-service targeting port 5678 on that pod.
+3 Create pod order-service using your pushed order-service image (from Image 3 above).
+4 From order-service: kubectl exec order-service -- curl -s http://inventory-service:5678
+5 Also try kubectl exec order-service -- curl -s http://<inventory-pod-IP>:5678 — note it also works right now.
+6 Delete and recreate the inventory-service pod (keep the Service and ConfigMap mount as-is). Get its new Pod IP.
+7 Curl again using the old Pod IP (fails) vs the Service name (still works).
+
+Expected result: Both curls in step 4/5 return a text response including config file APP_ENV: production. After recreating the pod in step 6, the old Pod IP curl fails (connection refused/timeout), while curl http://inventory-service:5678 in step 7 still succeeds and shows the same output — confirming the Service routes to whichever pod currently matches its selector, regardless of Pod IP changes.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc9$ ls
+inventory-service-pod.yml  inventory-service.yml  order-service-pod.yml
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc9$ cat inventory-service-pod.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: inventory-service
+  namespace: ns-1
+  labels:
+    app: inventory-service
+spec:
+  containers:
+    - name: inventory-service
+      image: avejlanjekar45/inventory-service:1.0
+      ports:
+        - containerPort: 5678
+      volumeMounts:
+        - name: inventory-pv
+          mountPath: /etc/app/config
+  volumes:
+    - name: inventory-pv
+      configMap:
+        name: app-config
+		
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc9$ cat inventory-service.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-service
+  namespace: ns-1
+spec:
+  selector:
+    app: inventory-service
+  ports:
+    - port: 5678
+      targetPort: 5678
+      protocol: TCP
+	  
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc9$ cat order-service-pod.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: order-service
+  namespace: ns-1
+spec:
+  containers:
+    - name: order-service
+      image: avejlanjekar45/order-service:1.0
+	  
+avej_lanjekar@AvejLanjekar:poc9$ kubectl exec -n ns-1 order-service -- curl -s http://inventory-service:5678
+INVENTORY SERVICE
+==================
+APP_ENV env var: <not set>
+DB_USERNAME env var: <not set>
+config file APP_ENV: production
+config file APP_NAME: inventory-serviceavej_lanjekar@AvejLanjekar:poc9$
+	  
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc9$ kubectl exec order-service -- curl -s http://10.244.1.16:5678
+INVENTORY SERVICE
+==================
+APP_ENV env var: <not set>
+DB_USERNAME env var: <not set>
+config file APP_ENV: production
+config file APP_NAME: inventory-service
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc9$ kubectl delete -f inventory-service-pod.yml
+pod "inventory-service" deleted from ns-1 namespace
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc9$ kubectl apply -f inventory-service-pod.yml
+pod/inventory-service created
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Poc-assignment/poc9$ kubectl exec order-service -- curl -s http://10.244.1.16:5678
+command terminated with exit code 28
+
+avej_lanjekar@AvejLanjekar:poc9$ kubectl exec -n ns-1 order-service -- curl -s http://inventory-service:5678
+INVENTORY SERVICE
+==================
+APP_ENV env var: <not set>
+DB_USERNAME env var: <not set>
+config file APP_ENV: production
+config file APP_NAME: inventory-serviceavej_lanjekar@AvejLanjekar:poc9$
+
+================================================================================================================================================================
+
+
+
+                                                                              ASSIGNMENT 1
+																			  
+1 Check the pod in all namespace with kubectl command and check the status of all the
+pods.
+---------------------------------------------------------------------------------------------------------------------------------------------------
+avej_lanjekar@AvejLanjekar:Assignment1$ kubectl get pods --all-namespaces
+NAMESPACE         NAME                                        READY   STATUS              RESTARTS         AGE
+cloudethix-avej   cloudethix-pod-9798fcf9d-5zsm9              1/1     Running             3                32h
+cloudethix-avej   cloudethix-pod-9798fcf9d-t8wtq              1/1     Running             3                32h
+default           cloudethix-static-minikube                  1/1     Running             3                29h
+default           config-subpath                              1/1     Running             14               9d
+default           database                                    1/1     Running             12               8d
+default           mysql-0                                     1/1     Running             5                2d9h
+default           mysql-1                                     1/1     Running             5                2d10h
+default           order-service                               1/1     Running             15               9d
+default           pod-a                                       1/1     Running             14               9d
+default           pod-b                                       1/1     Running             14               9d
+default           port-forward-pod                            1/1     Running             13               9d
+default           pvc-test                                    1/1     Running             14               9d
+default           sa-no-mount-test                            1/1     Running             14               9d
+default           sa-test                                     1/1     Running             14               9d
+default           svc-acc-pod                                 0/1     ContainerCreating   1 (9d ago)       9d
+default           web-pod                                     1/1     Running             13               9d
+ingress-nginx     ingress-nginx-controller-7d65c586d6-xx48q   1/1     Running             9                6d3h
+kube-system       coredns-7d764666f9-wqx9g                    1/1     Running             14               9d
+kube-system       csi-nfs-controller-7f8cc69c8-57d7x          5/5     Running             26               2d3h
+kube-system       csi-nfs-node-5khhg                          3/3     Running             15               2d3h
+kube-system       csi-nfs-node-glznq                          3/3     Running             15               2d3h
+kube-system       csi-nfs-node-pd72g                          3/3     Running             9                29h
+kube-system       etcd-minikube                               1/1     Running             14               9d
+kube-system       kindnet-dkrww                               1/1     Running             3                29h
+kube-system       kindnet-j4hzp                               1/1     Running             14               9d
+kube-system       kindnet-wp88p                               1/1     Running             5                2d3h
+kube-system       kube-apiserver-minikube                     1/1     Running             14               9d
+kube-system       kube-controller-manager-minikube            1/1     Running             15               9d
+kube-system       kube-proxy-g578q                            1/1     Running             63               2d3h
+kube-system       kube-proxy-ss6r5                            0/1     Error               44 (2m22s ago)   29h
+kube-system       kube-proxy-vbdw7                            1/1     Running             14               9d
+kube-system       kube-scheduler-minikube                     1/1     Running             14               9d
+kube-system       storage-provisioner                         1/1     Running             31 (4m8s ago)    9d
+ns-1              backend-7cdc9fcc87-6fhgn                    1/1     Running             2                9h
+ns-1              backend-7cdc9fcc87-w6ng5                    1/1     Running             2                9h
+ns-1              backend-7cdc9fcc87-zhg5g                    1/1     Running             2                9h
+ns-1              cloudethix-configmap-778f8bcdc7-fg5t9       1/1     Running             2                10h
+ns-1              cloudethix-configmap-778f8bcdc7-fvlv9       1/1     Running             2                10h
+ns-1              cloudethix-configmap-778f8bcdc7-htg2r       1/1     Running             2                10h
+ns-1              config-inspector                            1/1     Running             3                35h
+ns-1              config-subpath                              1/1     Running             3                35h																			  
+===============================================================================================================================================================
+
+2 Create one nginx pod on your Kubernetes cluster and then delete the same
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:Q2$ cat pod.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-pod
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      ports:
+        - containerPort: 80
+
+avej_lanjekar@AvejLanjekar:Q2$ kubectl apply -f pod.yml
+pod/nginx-pod created
+
+avej_lanjekar@AvejLanjekar:Q2$ kubectl get pods
+NAME                         READY   STATUS              RESTARTS     AGE
+nginx-pod                    1/1     Running             0            5s	
+
+avej_lanjekar@AvejLanjekar:Q2$ kubectl delete -f pod.yml
+pod "nginx-pod" deleted from default namespace
+
+===========================================================================================================================================================
+
+3 Create a yaml file for replicationcontroller and replicaset. Update the name from
+metadata and add yourname_rc and yourname_rs to both objects respectively. Once
+files are ready, deploy the objects in your K8S cluster with kubectl command.
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+avej_lanjekar@AvejLanjekar:Q4$ ls
+replicationController.yml
+
+avej_lanjekar@AvejLanjekar:Q4$ cat replicationController.yml
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: avej-rc
+spec:
+  replicas: 2
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          ports:
+            - containerPort: 80
+
+avej_lanjekar@AvejLanjekar:Q4$ kubectl apply -f replicationController.yml
+replicationcontroller/avej-rc created
+
+avej_lanjekar@AvejLanjekar:Q4$ kubectl get rc
+NAME      DESIRED   CURRENT   READY   AGE
+avej-rc   2         2         2       17s
+
+avej_lanjekar@AvejLanjekar:Q4$ kubectl get pods
+NAME                               READY   STATUS      RESTARTS   AGE
+avej-rc-7hztj                      1/1     Running     0          26s
+avej-rc-lrxxk                      1/1     Running     0          26s
+
+avej_lanjekar@AvejLanjekar:Q4$ cat replicaSet.yml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: avej-rs
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          ports:
+            - containerPort: 80
+
+avej_lanjekar@AvejLanjekar:Q4$ kubectl apply -f replicaSet.yml
+replicaset.apps/avej-rs created
+
+avej_lanjekar@AvejLanjekar:Q4$ kubectl get rs
+NAME                        DESIRED   CURRENT   READY   AGE
+avej-rs                     2         2         2       5s
+init-cont-deplo-db6fc8657   3         3         3       175m
+node-example-89b8c475c      1         1         1       156m
+
+avej_lanjekar@AvejLanjekar:Q4$ kubectl get pods
+NAME                               READY   STATUS      RESTARTS   AGE
+avej-rc-7hztj                      1/1     Running     0          4m42s
+avej-rc-lrxxk                      1/1     Running     0          4m42s
+avej-rs-6d72n                      1/1     Running     0          19s
+avej-rs-fx5q8                      1/1     Running     0          19s
+
+																			  
+=====================================================================================================================================================================																		
+4 Clone https://github.com/zembutsu/docker-sample-nginx.git on your local system.
+● Initialize one repo on your local system named Cloudethix-nginix-yourname and then
+copy all the content from cloned repo to your local repo.
+● Update the index.html and add the name CloudEthiX along with Hostname. Commit the
+change to your local repository. Then create and push the code from the local repository
+to your remote repository named Cloudethix-nginix-yourname under master branch.
+● Once code is pushed, create a Docker hub public repository named
+Cloudethix-nginix-yourname.
+● Then build the docker image out of the dockerfile. Once an image is built, tag the image
+and push that image to the docker hub repo you created.
+● Create a deployment.yaml file with 2 replications in cloudethix_yourname Namespace
+and use the container image that you have pushed to your docker hub repo. Once a file
+is created, run the deployment in k8s cluster.
+● Please prepare a document along with the snap and share it acros
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment1/Q5$ cd Cloudethix-nginx-Avej/
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment1/Q5/Cloudethix-nginx-Avej$ ls
+Dockerfile  LICENSE  README.md  default.conf  index.html
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment1/Q5/Cloudethix-nginx-Avej$ cat index.html
+<html>
+<body>
+        <h1>Host:  CloudEthiX <!--#echo var="HOSTNAME" --></h1>
+        Version: 1.1
+</body>
+</html>
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment1/Q5/Cloudethix-nginx-Avej$ git init
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint:   git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint:   git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+Initialized empty Git repository in /home/avej_lanjekar/kubernetes-Assignment/Repetition-1/Assignment1/Q5/Cloudethix-nginx-Avej/.git/
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment1/Q5/Cloudethix-nginx-Avej$ git status
+On branch master
+
+No commits yet
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        Dockerfile
+        LICENSE
+        README.md
+        default.conf
+        index.html
+
+nothing added to commit but untracked files present (use "git add" to track)
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment1/Q5/Cloudethix-nginx-Avej$ git add .
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment1/Q5/Cloudethix-nginx-Avej$ git status
+On branch master
+
+No commits yet
+
+Changes to be committed:
+  (use "git rm --cached <file>..." to unstage)
+        new file:   Dockerfile
+        new file:   LICENSE
+        new file:   README.md
+        new file:   default.conf
+        new file:   index.html
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment1/Q5/Cloudethix-nginx-Avej$ git commit -m "Initial Commit , adding all files"
+[master (root-commit) 25d68aa] Initial Commit , adding all files
+ 5 files changed, 46 insertions(+)
+ create mode 100644 Dockerfile
+ create mode 100644 LICENSE
+ create mode 100644 README.md
+ create mode 100644 default.conf
+ create mode 100644 index.html
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment1/Q5/Cloudethix-nginx-Avej$ git status
+On branch master
+nothing to commit, working tree clean
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment1/Q5/Cloudethix-nginx-Avej$ git remote add origin git@github.com:Avejlanjekar/Cloudethix-nginix-AvejLan.git
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment1/Q5/Cloudethix-nginx-Avej$ git branch -M main
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment1/Q5/Cloudethix-nginx-Avej$ git push -u origin main
+Enumerating objects: 7, done.
+Counting objects: 100% (7/7), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (7/7), done.
+Writing objects: 100% (7/7), 1.38 KiB | 202.00 KiB/s, done.
+Total 7 (delta 0), reused 0 (delta 0), pack-reused 0 (from 0)
+To github.com:Avejlanjekar/Cloudethix-nginix-AvejLan.git
+ * [new branch]      main -> main
+ 
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment1/Q5$ cat deployment.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudethix-pod
+  namespace: cloudethix-avej
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloudethix
+  template:
+    metadata:
+      labels:
+        app: cloudethix
+    spec:
+      containers:
+        - name: cloudethix
+          image: avejlanjekar45/cloudethix-nginix-avej
+          ports:
+            - containerPort: 80
+			
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment1/Q5$ kubectl get deployments -n cloudethix-avej
+NAME             READY   UP-TO-DATE   AVAILABLE   AGE
+cloudethix-pod   2/2     2            2           4m16s
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment1/Q5$ kubectl get pods -n cloudethix-avej
+NAME                             READY   STATUS    RESTARTS   AGE
+cloudethix-pod-9798fcf9d-5zsm9   1/1     Running   0          4m23s
+cloudethix-pod-9798fcf9d-t8wtq   1/1     Running   0          4m23s
+
+==========================================================================================================================================================
+
+                                                                              ASSIGNMENT 2
+																			  
+Q1 Create 2 Public Docker Hub registries named
+cloudethix_master_nginx_yourname & cloudethix_release_nginx_yourname.
+● Clone below repository on your system.
+https://github.com/zembutsu/docker-sample-nginx.git
+● Initialize a local repository & copy the code from above repo to your local
+repository in master branch and then create below branches.
+release
+main
+hotfix
+● Once code is copied to local repository,from master branch update the
+index.html and add word "Cloudethix Master Branch Nginx" and build the
+docker image & add meaningful tags and push to Docker Hub registry
+cloudethix_master_nginx_yourname.
+● Also from release branch update the index.html and add word "Cloudethix
+Release Branch Nginx" and build the docker image & add meaningful tags
+and push to Docker Hub registry cloudethix_release_nginx_yourname.
+● Once Images are copied to Docker hub registries, switch to the main
+branch.
+● In main branch create directory named kube/clusterIP & inside kube
+directory create file named master_pod.yaml with pod name master_nginx &
+with label master_nginx & add image that you have pushed in Docker Hub
+registry cloudethix_master_nginx_yourname.
+● Also create a file release_pod.yaml with pod name release_nginx & with
+label release_nginx & add image that you have pushed in Docker Hub
+registry cloudethix_release_nginx_yourname.
+● Create a file called cluster_ip-service.yaml with service name
+cloudethix_clusterip and with Type clusterIP.
+● Then, select the pod with label release_nginx in service.
+● Create all these three resources in your k8s cluster.
+● Now, access master_nginx pod shell & curl the master_nginx pod & check
+the result.
+● Also try to curl release_nginx pod with DNS name & check the result.
+● Then curl the clusterip service with its name and check the result.
+● Finally, create a GITHUB remote repository named
+cloudethix-k8s-yourname and push all the branches to the remote
+repository.
+● Take all screenshots and create a well formatted document.
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git status
+On branch master
+
+No commits yet
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        Dockerfile
+        LICENSE
+        README.md
+        default.conf
+        index.html
+
+nothing added to commit but untracked files present (use "git add" to track)
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git add .
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git status
+On branch master
+
+No commits yet
+
+Changes to be committed:
+  (use "git rm --cached <file>..." to unstage)
+        new file:   Dockerfile
+        new file:   LICENSE
+        new file:   README.md
+        new file:   default.conf
+        new file:   index.html
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git commit -m "initial commit adding all files"
+[master (root-commit) 8e4394b] initial commit adding all files
+ 5 files changed, 46 insertions(+)
+ create mode 100644 Dockerfile
+ create mode 100644 LICENSE
+ create mode 100644 README.md
+ create mode 100644 default.conf
+ create mode 100644 index.html
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git branch
+* master
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git branch release
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git branch hotfix
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git branch main
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git branch
+  hotfix
+  main
+* master
+  release
+  
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ ls
+Dockerfile  LICENSE  README.md  default.conf  index.html
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ vim index.html
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ cat index.html
+<html>
+<body>
+        <h1>Host: <!--#echo var="HOSTNAME" --></h1>
+        Version: 1.1
+        <h2>Cloudethix Master Branch Nginx</h2>
+</body>
+</html>
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ docker build -t cloudethix_master_nginx .
+STEP 1/3: FROM nginx:alpine
+STEP 2/3: COPY default.conf /etc/nginx/conf.d/
+--> Using cache 0989e7142eba649abc4d95f1780a91bf1f19479e0fc6153f85667cfc7b500de5
+--> 0989e7142eba
+STEP 3/3: COPY index.html /usr/share/nginx/html/
+COMMIT cloudethix_master_nginx
+--> 7dd2f9352848
+Successfully tagged localhost/cloudethix_master_nginx:latest
+7dd2f93528487390cfb59c864cf86ca1ee436e51a9ce50b0a7c81d93810e4c81
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ docker tag cloudethix_master_nginx avejlanjekar45/cloudethix_master_nginx_avejlanjekar
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ docker push avejlanjekar45/cloudethix_master_nginx_avejlanjekar
+Getting image source signatures
+Copying blob 1ed8e39a7434 skipped: already exists
+Copying blob 55afa1ecc21d skipped: already exists
+Copying blob 8cdfe4f23778 skipped: already exists
+Copying blob 0d62d88506ba skipped: already exists
+Copying blob 0ea935727878 skipped: already exists
+Copying blob d94291c26261 skipped: already exists
+Copying blob 90a6a705d1fb done   |
+Copying blob da4dea1b00af skipped: already exists
+Copying blob fb597529c916 skipped: already exists
+Copying blob ba05887de274 skipped: already exists
+Copying config 7dd2f93528 done   |
+Writing manifest to image destination
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx/kube/clusterIP$ cat cluster_ip-service.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloudethix-clusterip
+  namespace: ns-1
+spec:
+  selector:
+    app: release-nginx
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP
+  
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx/kube/clusterIP$ kubectl get pods
+NAME                                    READY   STATUS              RESTARTS   AGE
+master-nginx                            1/1     Running             0          16m
+release-nginx                           1/1     Running             0          15m
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx/kube/clusterIP$ kubectl get service
+NAME                       TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE
+cloudethix-clusterip       ClusterIP   10.97.252.69     <none>        80/TCP           17m
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx/kube/clusterIP$ kubectl exec -it master-nginx -- sh
+/ # curl http://localhost
+<html>
+<body>
+        <h1>Host: master-nginx</h1>
+        Version: 1.1
+        <h2>Cloudethix Master Branch Nginx</h2>
+</body>
+</html>
+/ #
+/ #
+
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git status
+On branch main
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   index.html
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        kube/
+
+no changes added to commit (use "git add" and/or "git commit -a")
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git add .
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git status
+On branch main
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+        modified:   index.html
+        new file:   kube/clusterIP/cluster_ip-service.yml
+        new file:   kube/master_pod.yaml
+        new file:   kube/release_pod.yaml
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git commit -m " Adding all files"
+[main edb6da1]  Adding all files
+ 4 files changed, 40 insertions(+)
+ create mode 100644 kube/clusterIP/cluster_ip-service.yml
+ create mode 100644 kube/master_pod.yaml
+ create mode 100644 kube/release_pod.yaml
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git remote -v
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git remote add origin git@github.com:Avejlanjekar/cloudethix-k8s-Avejlanjekar.git
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git branch -M main
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx$ git push -u origin main
+Enumerating objects: 15, done.
+Counting objects: 100% (15/15), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (15/15), done.
+Writing objects: 100% (15/15), 2.21 KiB | 376.00 KiB/s, done.
+Total 15 (delta 3), reused 0 (delta 0), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (3/3), done.
+To github.com:Avejlanjekar/cloudethix-k8s-Avejlanjekar.git
+ * [new branch]      main -> main
+branch 'main' set up to track 'origin/main'.
+
+=============================================================================================================================================
+Q2
+In the main branch of your local repository create a directory
+kube/NodePort.
+● Create below files from below url. Please make sure you will create
+NodePort service with port 30008 instead of loadbalancer.
+https://kubernetes.io/docs/tasks/access-application-cluster/connec
+ting-frontend-backend/.
+backend-deployment.yaml
+backend-service.yaml
+frontend-deployment.yaml
+frontend-NodePort-service.yaml
+● Once files are created , create all the resources in your k8s cluster.
+● Access all public ips with port 30008 in the browser and then check the
+result.
+● Finally, push all the latest code to the remote repository.
+● Take all screenshots and create a well formatted document.
+
+----------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx/kube/NodePort$ cat backend-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  selector:
+    matchLabels:
+      app: hello
+      tier: backend
+      track: stable
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: hello
+        tier: backend
+        track: stable
+    spec:
+      containers:
+        - name: hello
+          image: "gcr.io/google-samples/hello-go-gke:1.0"
+          ports:
+            - name: http
+              containerPort: 80
+			  
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx/kube/NodePort$ cat backend-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello
+spec:
+  selector:
+    app: hello
+    tier: backend
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: http
+	
+	
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx/kube/NodePort$ cat frontend-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  selector:
+    matchLabels:
+      app: hello
+      tier: frontend
+      track: stable
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: hello
+        tier: frontend
+        track: stable
+    spec:
+      containers:
+        - name: nginx
+          image: "gcr.io/google-samples/hello-frontend:1.0"
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/usr/sbin/nginx","-s","quit"]
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx/kube/NodePort$ cat frontend-NodePort-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+spec:
+  selector:
+    app: hello
+    tier: frontend
+  ports:
+  - protocol: "TCP"
+    port: 80
+    targetPort: 80
+    nodePort: 30008
+  type: NodePort
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx/kube/NodePort$ kubectl get deployments
+NAME                   READY   UP-TO-DATE   AVAILABLE   AGE
+backend                3/3     3            3           21m
+cloudethix-configmap   3/3     3            3           99m
+flask-webapp           3/3     3            3           19h
+frontend               0/1     1            0           20m
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx/kube/NodePort$ kubectl get svc
+NAME                       TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE
+cloudethix-clusterip       ClusterIP   10.97.252.69     <none>        80/TCP           21h
+frontend                   NodePort    10.102.240.80    <none>        80:30008/TCP     20m
+hello                      ClusterIP   10.109.106.24    <none>        80/TCP           21m  
+
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q1/cloudethix-nginx/kube/NodePort$ minikube service frontend -n ns-1 --url
+http://127.0.0.1:42331
+❗  Because you are using a Docker driver on linux, the terminal needs to be open to run it.
+
+
+
+=========================================================================================================================================
+
+Q3 Create any 2 pods and assign them to different worker nodes with nodeName property.
+
+-----------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q2$ cat pod-1.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-1
+  namespace: ns-1
+spec:
+  containers:
+    - name: pod-1
+      image: nginx
+      ports:
+        - containerPort: 80
+  nodeName: minikube
+  
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q2$ cat pod-2.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-2
+  namespace: ns-1
+spec:
+  containers:
+    - name: pod-2
+      image: nginx
+      ports:
+        - containerPort: 80
+  nodeName: minikube-m02
+  
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q2$ kubectl get pods -o wide
+NAME                          READY   STATUS    RESTARTS   AGE     IP            NODE           NOMINATED NODE   READINESS GATES
+pod-1                         1/1     Running   0          2m43s   10.244.0.30   minikube       <none>           <none>
+pod-2                         1/1     Running   0          62s     10.244.1.22   minikube-m02   <none>           <none>
+
+===================================================================================================================================================
+Que 4 →
+● Label both worker nodes such as worker-0 node as cloudethix-k8s-00 &
+worker-1 node as cloudethix-k8s-01.
+● Once nodes are labeled, create pod00.yaml file and schedule the pod on
+worker-0 node with nodeSelector property. Also create one more file named
+pod01.yaml & schedule the pod on worker-1 node.
+
+-------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q4$ kubectl label node minikube-m02 node-name=cloudethix-k8s-00
+node/minikube-m02 labeled
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q4$ kubectl label node minikube-m03 node-name=cloudethix-k8s-01
+node/minikube-m03 labeled
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q4$ kubectl get nodes -L node-name
+NAME           STATUS   ROLES           AGE   VERSION   NODE-NAME
+minikube       Ready    control-plane   9d    v1.35.1
+minikube-m02   Ready    <none>          43h   v1.35.1   cloudethix-k8s-00
+minikube-m03   Ready    <none>          21h   v1.35.1   cloudethix-k8s-01
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q4$ cat pod00.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-0
+  namespace: ns-1
+spec:
+  nodeSelector:
+    node-name: cloudethix-k8s-00
+  containers:
+    - name: pod-0
+      image: nginx
+      ports:
+        - containerPort: 80
+		
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q4$ cat pod01.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-01
+  namespace: ns-1
+spec:
+  nodeSelector:
+    node-name: cloudethix-k8s-01
+  containers:
+    - name: pod-1-cont
+      image: nginx
+      ports:
+        - containerPort: 80
+		
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q4$ kubectl get pods -o wide
+NAME                                    READY   STATUS              RESTARTS         AGE     IP            NODE           NOMINATED NODE   READINESS GATES
+pod-0                                   1/1     Running             0                5m36s   10.244.1.22   minikube-m02   <none>           <none>
+pod-01                                  1/1     Running             0                92s     10.244.3.9    minikube-m03   <none>           <none>
+
+
+
+========================================================================================================================================================
+Q5 Clone the below repo locally & create DaemonSet from directory DaemonSet101.
+https://github.com/collabnix/kubelabs
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q5$ git clone https://github.com/collabnix/kubelabs.git
+Cloning into 'kubelabs'...
+remote: Enumerating objects: 14031, done.
+remote: Counting objects: 100% (707/707), done.
+remote: Compressing objects: 100% (147/147), done.
+remote: Total 14031 (delta 637), reused 560 (delta 560), pack-reused 13324 (from 5)
+Receiving objects: 100% (14031/14031), 61.81 MiB | 4.16 MiB/s, done.
+Resolving deltas: 100% (4181/4181), done.
+Updating files: 100% (7374/7374), done.
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q5$ ls
+kubelabs
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q5$ cd kubelabs/
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q5/kubelabs$ ls
+ 201                    Gemfile                      LICENSE                    Secrets101            assets                        kube101.md
+ AKS101                 Gemfile.lock                 LKE101                     Security101           bluegreen                     kubectl-for-docker.md
+ Autoscaler101          GitLab101                    'Labels&Selectors'         ServiceCatalog101     bootstrap.sh                  namespace.yaml
+ CONTRIBUTING.md        GitOps101                    Labels-and-Selectors       ServiceMesh101        cka                           nodejs.md
+ Chaos101               Helm101                      Loft101                    Services101           context                       pods101
+ 'Cheat Sheets'         IOT                          Logging101                 Shipa101              detect.md                     pods101.png
+ ClusterNetworking101   Ingress101                   ManagedKubernetes          SlidesReplicaSet101   dockerdesktopformac           portainer
+ ConfigMaps101          InitContainers101            Monitoring101              Slides_Services101    dockervsk8s                   portainer.yaml
+ Cronjobs101            JavaClient101                MultiTenant101             StatefulSets101       gke-setup.md                  python
+ Cronjobs101.md         Jenkins101                   Network_Policies101        Strimzi101            golang                        replicaset101
+ DaemonSet101           Jobs101                      Observability101           Terraform101          helm                          scripts
+ Deployment101          Karpenter101                 Pods101_slides             Weave-UI.png          images                        secerts_configmaps101
+ Deployment101_slides   Keda101                      RBAC101                    _config.yml           img                           weave-pwk.md
+ DevSpace101            KubeSphere                   README.md                  _config_dev.yml       install                       weave-service.png
+ DisasterRecovery101    Kubernetes_Architecture.md   ReplicationController101   _layouts              intermediate                  weave.jpg
+ EKS101                 Kubernetes_Intro_slides-1    ResourceQuota101           _site                 jekyll-theme-hacker.gemspec   weave.md
+ GKE101                 Kubezoo                      Rollouts101                ai                    k3s
+ Gateway101             Kyverno101                   Scheduler101               api.md                k8sworkshop.png
+ 
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q5/kubelabs$ cd DaemonSet101/
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q5/kubelabs/DaemonSet101$ ls
+README.md  daemonset.yml
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q5/kubelabs/DaemonSet101$ cat daemonset.yml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: prometheus-daemonset
+spec:
+  selector:
+    matchLabels:
+      tier: monitoring
+      name: prometheus-exporter
+  template:
+    metadata:
+      labels:
+        tier: monitoring
+        name: prometheus-exporter
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/node-exporter
+        ports:
+        - containerPort: 80
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q5/kubelabs/DaemonSet101$ kubectl apply -f daemonset.yml
+daemonset.apps/prometheus-daemonset created
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q5/kubelabs/DaemonSet101$ kubectl get ds
+NAME                   DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+prometheus-daemonset   2         2         2       2            2           <none>          32s
+
+====================================================================================================================================================
+
+Q6 Create a static pod with name cloudethix-static in your k8s cluster. Refer below link.
+https://kubernetes.io/docs/tasks/configure-pod-container/static-pod
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q5/kubelabs/DaemonSet101$ minikube ssh
+docker@minikube:~$docker@minikube:~$ cd /etc/kubernetes
+docker@minikube:/etc/kubernetes$ ls
+addons  admin.conf  controller-manager.conf  kubelet.conf  manifests  scheduler.conf  super-admin.conf
+docker@minikube:/etc/kubernetes$ cd manifests
+docker@minikube:/etc/kubernetes/manifests$ cat cloudethix-static.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cloudethix-static
+  labels:
+    app: cloudethix-static
+spec:
+  containers:
+    - name: nginx
+      image: docker.io/library/nginx:alpine
+      ports:
+        - containerPort: 80
+docker@minikube:/etc/kubernetes/manifests$
+
+docker@minikube:/etc/kubernetes/manifests$ ls
+cloudethix-static.yaml  etcd.yaml  kube-apiserver.yaml  kube-controller-manager.yaml  kube-scheduler.yaml
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q5/kubelabs/DaemonSet101$ kubectl get pods -A
+NAMESPACE         NAME                                        READY   STATUS              RESTARTS        AGE
+cloudethix-avej   cloudethix-pod-9798fcf9d-5zsm9              1/1     Running             0               177m
+cloudethix-avej   cloudethix-pod-9798fcf9d-t8wtq              1/1     Running             0               177m
+default           cloudethix-static-minikube                  1/1     Running             0               6m31s
+=============================================================================================================================================================
+
+Que 7 →
+● Install Kubectx & kubens in your k8s cluste
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q7$ sudo apt install kubectx -y
+kubectx is already the newest version (0.9.5-2build1).
+Summary:
+  Upgrading: 0, Installing: 0, Removing: 0, Not Upgrading: 62
+  
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q7$ kubectx
+avej-context
+minikube
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment2/Q7$ kubens
+cloudethix-avej
+default
+ingress-nginx
+kube-node-lease
+kube-public
+kube-system
+ns-1
+poc
+repeat-1
+
+
+
+=======================================================================================================================================================
+                                                                                  Assignment 3
+																				  
+Q1 Create 1 Public Docker Hub registry named flask_webapp_yourname.
+● Clone below repository on your system.
+https://github.com/mmumshad/simple-webapp-docker.git
+● Initialize a local repository & copy the code from above repo to your local repository in
+your working branch.
+● Once code is copied to the local repository, build the docker image & add meaningful
+tags with version 1 and push to Docker Hub registry.
+● Once Images are pushed to Docker hub registries, create a directory named kube.
+Inside the kube directory create deployement.yaml file with 3 replication , labels app:
+flask-webapp , containerPort: 8080 and add the image that you have pushed in Docker
+Hub registry.
+● Create one service.yaml file with type nodeport & select flask-webapp with port 8080 &
+targetPort 8080 with any nodePort between range 30000-32768.
+● Once a service is created try accessing the web page in the browser as below. (30011 is
+nodeport mentioned in service.yaml). Meanwhile open app.py from your code to
+understand paths & output.
+http://master_ip:30011/
+http://master_ip:30011/how are you
+● Now , update the app.py from your code and add below route above if __name__ ==
+"__main__" line
+@app.route('/Who are you')
+def cloudethix():
+return 'Yes, I am cloudethix, and You !!!'
+● Once the file is updated , rebuild the docker image & add meaningful tags with version 2
+and push to Docker Hub registry.
+● Now we have the latest docker image in repo, It's time to roll out a new image. Roll out
+the new Image with all three ways one by one.
+1. With kubectl set command
+2. With kubectl edit deployment
+3. With deployment.yaml file modification.
+● Run the # kubectl rollout command to check status and history.
+● Note:- Once above step 1 is done , run # kubectl rollout undo deployment command to
+rollback the change and then try a second way of rollout.
+● In the browser run all three routes & notice the changes.
+http://master_ip:30011/
+http://master_ip:30011/how are you
+http://master_ip:30011/Who are you
+● Once done with all above steps , commit all the changes to the remote repository
+
+--------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1$ git clone https://github.com/mmumshad/simple-webapp-docker.git
+Cloning into 'simple-webapp-docker'...
+remote: Enumerating objects: 14, done.
+remote: Counting objects: 100% (7/7), done.
+remote: Compressing objects: 100% (5/5), done.
+remote: Total 14 (delta 3), reused 2 (delta 2), pack-reused 7 (from 1)
+Receiving objects: 100% (14/14), done.
+Resolving deltas: 100% (3/3), done.
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1$ cp -r simple-webapp-docker/* flask_webapp/
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1$ ls
+flask_webapp  simple-webapp-docker
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1$ cd flask_webapp/
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ ls
+Dockerfile  app.py
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ git init
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint:   git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint:   git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+Initialized empty Git repository in /home/avej_lanjekar/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/.git/
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ git status
+On branch master
+
+No commits yet
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        Dockerfile
+        app.py
+
+nothing added to commit but untracked files present (use "git add" to track)
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ docker build -t flask_webapp:version1 .
+STEP 1/5: FROM ubuntu:20.04
+Resolved "ubuntu" as an alias (/etc/containers/registries.conf.d/shortnames.conf)
+Trying to pull docker.io/library/ubuntu:20.04...
+Getting image source signatures
+Copying blob 13b7e930469f done   |
+Copying config b7bab04fd9 done   |
+Writing manifest to image destination
+STEP 2/5: RUN apt-get update && apt-get install -y python3 python3-pip
+Get:1 http://security.ubuntu.com/ubuntu focal-security InRelease [128 kB]
+Get:2 http://archive.ubuntu.com/ubuntu focal InRelease [265 kB]
+Get:3 http://security.ubuntu.com/ubuntu focal-security/multiverse amd64 Packages [32.5 kB]
+Get:4 http://security.ubuntu.com/ubuntu focal-security/restricted amd64 Packages [4710 kB]
+Get:5 http://archive.ubuntu.com/ubuntu focal-updates InRelease [128 kB]
+Get:6 http://archive.ubuntu.com/ubuntu focal-backports InRelease [128 kB]
+Get:7 http://security.ubuntu.com/ubuntu focal-security/universe amd64 Packages [1300 kB]
+Get:8 http://security.ubuntu.com/ubuntu focal-security/main amd64 Packages [4368 kB]
+Get:9 http://archive.ubuntu.com/ubuntu focal/multiverse amd64 Packages [177 kB]
+Get:10 http://archive.ubuntu.com/ubuntu focal/universe amd64 Packages [11.3 MB]
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ docker tag flask_webapp:version1 avejlanjekar45/flask_webapp_av
+ej:version1
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ docker push avejlanjekar45/flask_webapp_avej:version1
+Getting image source signatures
+Copying blob 68199f7ab160 done   |
+Copying blob 96a1aa32f272 done   |
+Copying blob 7ef1324fc058 done   |
+Copying blob 13b7e930469f skipped: already exists
+Copying config 0d76e83579 done   |
+Writing manifest to image destination
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ mkdir kube
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ cd kube/
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ vim deployment.yml
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ ls
+deployment.yml
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ cat deployment.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-webapp
+  namespace: ns-1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: flask-webapp
+  template:
+    metadata:
+      labels:
+        app: flask-webapp
+    spec:
+      containers:
+        - name: flask-webapp
+          image: avejlanjekar45/flask_webapp_avej:version-2
+          ports:
+            - containerPort: 8080
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ vim service.yml
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ cat service.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: flask-webapp-svc
+  namespace: ns-1
+spec:
+  type: NodePort
+  selector:
+    app: flask-webapp
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30011
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ kubectl get deployments
+NAME           READY   UP-TO-DATE   AVAILABLE   AGE
+flask-webapp   3/3     3            3           3h15m
+nfs-server     1/1     1            1           8h
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ kubectl get svc
+NAME                   TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE
+cloudethix-clusterip   ClusterIP   10.97.252.69     <none>        80/TCP           5h14m
+flask-webapp-svc       NodePort    10.104.135.92    <none>        8080:30011/TCP   3h14m
+inventory-service      ClusterIP   10.102.75.180    <none>        5678/TCP         8h
+nfs-server             ClusterIP   10.109.166.116   <none>        2049/TCP         8h
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ curl http://192.168.49.2:30011/
+Welcome!
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ curl "http://192.168.49.2:30011/how%20are%20you"
+I am good, how about you?
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ cat app.py
+import os
+from flask import Flask
+app = Flask(__name__)
+
+@app.route("/")
+def main():
+    return "Welcome!"
+
+@app.route('/how are you')
+def hello():
+    return 'I am good, how about you?'
+
+if __name__ == "__main__":
+    app.run()
+
+@app.route('/Who are you')
+def cloudethix():
+    return 'Yes, I am cloudethix, and You !!!'
+	
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ docker build -t flask_webapp:version-2 .
+STEP 1/5: FROM ubuntu:20.04
+STEP 2/5: RUN apt-get update && apt-get install -y python3 python3-pip
+--> Using cache a2753bbdc460a9c05a7240ec9f1be9eaf3732ba6d592b3a403b3ee2b81a82cbf
+--> a2753bbdc460
+STEP 3/5: RUN pip install flask
+--> Using cache 78efa4ef97b780ce79b296f086decd52be0646fd98d8aaf4667f6322cedc4436
+--> 78efa4ef97b7
+STEP 4/5: COPY app.py /opt/
+--> acf77daebf8f
+STEP 5/5: ENTRYPOINT FLASK_APP=/opt/app.py flask run --host=0.0.0.0 --port=8080
+COMMIT flask_webapp:version-2
+--> f62c9c6e657b
+Successfully tagged localhost/flask_webapp:version-2
+f62c9c6e657bbac895b6de5dd6a831b41298094116dc27c5bb69ad3977a3910f
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ docker tag flask_webapp:version-2 avejlanjekar45/flask_webapp_avej:version-2
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ docker push avejlanjekar45/flask_webapp_avej:version-2
+Getting image source signatures
+Copying blob 0cb734515e39 done   |
+Copying blob 67f28aede3f8 skipped: already exists
+Copying blob 13b7e930469f skipped: already exists
+Copying blob c6459ed4af3c skipped: already exists
+Copying config f62c9c6e65 done   |
+Writing manifest to image destination
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ kubectl set image deployment/flask-webapp flask-webapp=avejlanjekar45/flask_webapp_avej:version-2
+deployment.apps/flask-webapp image updated
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ kubectl rollout status deployment/flask-webapp
+deployment "flask-webapp" successfully rolled out
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ curl http://192.168.49.2:30011/
+Welcome!avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ curl http://192.168.49.2:30011/how%20are%20you
+I am good, how about you?
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ curl "http://192.168.49.2:30011/Who%20are%20you"
+Yes, I am cloudethix, and You !!!
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ kubectl rollout history deployment/flask-webapp
+deployment.apps/flask-webapp
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ kubectl edit deployment/flask-webapp
+deployment.apps/flask-webapp edited
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ kubectl rollout status deployment/flask-webapp
+deployment "flask-webapp" successfully rolled out
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ kubectl rollout history deployment/flask-webapp
+deployment.apps/flask-webapp
+REVISION  CHANGE-CAUSE
+2         <none>
+3         <none>
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ kubectl apply -f deployment.yml
+deployment.apps/flask-webapp configured
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ kubectl rollout status deployment/flask-webapp
+deployment "flask-webapp" successfully rolled out
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ kubectl rollout history deployment/flask-webapp
+deployment.apps/flask-webapp
+REVISION  CHANGE-CAUSE
+3         <none>
+4         <none>
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ curl "http://192.168.49.2:30011/how%20are%20you"
+I am good, how about you?
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ curl "http://192.168.49.2:30011/Who%20are%20you"
+Yes, I am cloudethix, and You !!!
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp/kube$ curl "http://192.168.49.2:30011/"
+Welcome!
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ git status
+On branch master
+
+No commits yet
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        Dockerfile
+        app.py
+        kube/
+
+nothing added to commit but untracked files present (use "git add" to track)
+
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ git add .
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ git commit -m "Added kubernetes deployment"
+[master (root-commit) e6006b7] Added kubernetes deployment
+ 4 files changed, 60 insertions(+)
+ create mode 100644 Dockerfile
+ create mode 100644 app.py
+ create mode 100644 kube/deployment.yml
+ create mode 100644 kube/service.yml
+ 
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ git status
+On branch master
+nothing to commit, working tree clean
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ git remote -v
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ git remote add origin git@github.com:Avejlanjekar/flask-k8s-rolling-update-deployment.git
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ git branch -M main
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q1/flask_webapp$ git push -u origin main
+Enumerating objects: 7, done.
+Counting objects: 100% (7/7), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (7/7), done.
+Writing objects: 100% (7/7), 1.05 KiB | 269.00 KiB/s, done.
+Total 7 (delta 0), reused 0 (delta 0), pack-reused 0 (from 0)
+To github.com:Avejlanjekar/flask-k8s-rolling-update-deployment.git
+ * [new branch]      main -> main
+branch 'main' set up to track 'origin/main'.
+=============================================================================================================================================================
+2 →
+● Download and install Lens & access your k8s cluster from Lens.
+● Create nginx Pod and Nodeport service. Check the Pod logs from Lens.
+● Check the service from lens. Also login to the pod shell using the lens.
+● Take snaps and delete the resources that you have just created.
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+avej_lanjekar@AvejLanjekar:Q4$ minikube dashboard
+🔌  Enabling dashboard ...
+    ▪ Using image docker.io/kubernetesui/dashboard:v2.7.0
+    ▪ Using image docker.io/kubernetesui/metrics-scraper:v1.0.8
+💡  Some dashboard features require the metrics-server addon. To enable all features please run:
+
+        minikube addons enable metrics-server
+
+🤔  Verifying dashboard health ...
+🚀  Launching proxy ...
+🤔  Verifying proxy health ...
+🎉  Opening http://127.0.0.1:43941/api/v1/namespaces/kubernetes-dashboard/services/http:kubernetes-dashboard:/proxy/ in your default browser...
+👉  http://127.0.0.1:43941/api/v1/namespaces/kubernetes-dashboard/services/http:kubernetes-dashboard:/proxy/
+
+avej_lanjekar@AvejLanjekar:Q2$ ls
+pod.yml  service.yml
+
+avej_lanjekar@AvejLanjekar:Q2$ cat pod.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nginx
+  labels:
+    app: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      ports:
+        - containerPort: 80
+avej_lanjekar@AvejLanjekar:Q2$ cat service.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodeport-svc
+spec:
+  selector:
+    app: nginx
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30007
+	  
+
+
+
+=========================================================================================================================================================================
+Q3  Create 1 Public Docker Hub registry named cloudethix_configmap_yourname.
+● Clone below repository on your system.
+https://github.com/zembutsu/docker-sample-nginx.git
+● Initialize a local repository & copy the code from above repo to your local repository in
+the working branch.
+● Once code is copied , build a docker image from docker file and add meaningful tags
+and push to docker hub repository.
+● Once Images are pushed to Docker hub registries, create a directory named kube.
+Inside the kube directory create deployement.yaml file with 3 replication , labels app:
+frontend-webapp , containerPort: 80 and add the image that you have pushed in Docker
+Hub registry.
+● Create one service.yaml file with type nodeport & select frontend-webapp pod with port
+80 & targetPort 80 with any nodePort between range 30000-32768.
+● Once the service is created try accessing the web page in the browser as below. Notice
+the changes & take the snap.
+● Now create a configmap.yaml file with below data & delete the deployment that you have
+created.
+<html>
+<body>
+<h1> I am Cloudethix Team, Are you ?!! </h1>
+Version: 1.1
+</body>
+</html>
+● Then update the same deployment.yaml file and mount configmap as volume on
+container using volumeMounts with mountPath /usr/share/nginx/html/
+● Now it's time to create configmap & deployment. Once created , try to access the
+webpage in the browser & confirm that the index page is the same as we have in
+configmap.
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3$ git clone https://github.com/zembutsu/docker-sample-nginx.git
+Cloning into 'docker-sample-nginx'...
+remote: Enumerating objects: 22, done.
+remote: Counting objects: 100% (12/12), done.
+remote: Compressing objects: 100% (6/6), done.
+remote: Total 22 (delta 7), reused 6 (delta 6), pack-reused 10 (from 1)
+Receiving objects: 100% (22/22), done.
+Resolving deltas: 100% (7/7), done.
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3$ mkdir clouethix-configmap
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3$ ls
+clouethix-configmap  docker-sample-nginx
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3$ cp docker-sample-nginx/* clouethix-configmap/
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3$ ls
+clouethix-configmap  docker-sample-nginx
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3$ cd clouethix-configmap/
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3/clouethix-configmap$ ls
+Dockerfile  LICENSE  README.md  default.conf  index.html
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3/clouethix-configmap$ docker build -t cloudethix-configmap .
+STEP 1/3: FROM nginx:alpine
+STEP 2/3: COPY default.conf /etc/nginx/conf.d/
+--> Using cache 0989e7142eba649abc4d95f1780a91bf1f19479e0fc6153f85667cfc7b500de5
+--> 0989e7142eba
+STEP 3/3: COPY index.html /usr/share/nginx/html/
+COMMIT cloudethix-configmap
+--> b8bf8728f7f5
+Successfully tagged localhost/cloudethix-configmap:latest
+b8bf8728f7f56726509964c82b8020ce24f4c0cd049539aeb69c604660d03136
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3/clouethix-configmap$ docker tag cloudethix-configmap avejlanjekar45/cloudethix_configmap_avej
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3/clouethix-configmap/kube$ docker push avejlanjekar45/cloudethix_configmap_avej
+Getting image source signatures
+Copying blob 1ed8e39a7434 skipped: already exists
+Copying blob 8cdfe4f23778 skipped: already exists
+Copying blob d94291c26261 skipped: already exists
+Copying blob 0ea935727878 skipped: already exists
+Copying blob 0d62d88506ba skipped: already exists
+Copying blob 55afa1ecc21d skipped: already exists
+Copying blob 03c47411bc64 done   |
+Copying blob da4dea1b00af skipped: already exists
+Copying blob fb597529c916 skipped: already exists
+Copying blob ba05887de274 skipped: already exists
+Copying config b8bf8728f7 done   |
+Writing manifest to image destination
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3/clouethix-configmap/kube$ cat deployment.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudethix-configmap
+  namespace: ns-1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: frontend-webapp
+  template:
+    metadata:
+      labels:
+        app: frontend-webapp
+    spec:
+      containers:
+        - name: cloudethix-cm
+          image: avejlanjekar45/cloudethix_configmap_avej
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: frontend-config-map
+              mountPath: /usr/share/nginx/html/
+      volumes:
+        - name: frontend-config-map
+          configMap:
+            name: frontend-config
+			
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3/clouethix-configmap/kube$ cat service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloudethix-configmap-svc
+  namespace: ns-1
+spec:
+  type: NodePort
+  selector:
+    app: frontend-webapp
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30010
+	  
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3/clouethix-configmap/kube$ curl http://192.168.49.2:30010
+<html>
+<body>
+        <h1>Host: cloudethix-configmap-7b8849c65f-d4464</h1>
+        Version: 1.1
+</body>
+</html>
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3/clouethix-configmap/kube$ kubectl delete deployment cloudethix-configmap
+deployment.apps "cloudethix-configmap" deleted from ns-1 namespace
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3/clouethix-configmap/kube$ cat configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+data:
+  index.html: |
+    <html>
+    <body>
+    <h1>I am Cloudethix Team, Are you ?!!</h1>
+    Version: 1.1
+    </body>
+    </html>
+	
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3/clouethix-configmap/kube$ kubectl apply -f configmap.yaml
+configmap/frontend-config created
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3/clouethix-configmap/kube$ cat deployment.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudethix-configmap
+  namespace: ns-1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: frontend-webapp
+  template:
+    metadata:
+      labels:
+        app: frontend-webapp
+    spec:
+      containers:
+        - name: cloudethix-cm
+          image: avejlanjekar45/cloudethix_configmap_avej
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: frontend-config-map
+              mountPath: /usr/share/nginx/html/
+      volumes:
+        - name: frontend-config-map
+          configMap:
+            name: frontend-config
+			
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3/clouethix-configmap/kube$ kubectl get deployments
+NAME                   READY   UP-TO-DATE   AVAILABLE   AGE
+cloudethix-configmap   3/3     3            3           5m18s
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3/clouethix-configmap/kube$ kubectl get cm
+NAME               DATA   AGE
+frontend-config    1      5m53s
+
+avej_lanjekar@AvejLanjekar:~/kubernetes-Assignment/Repetition-1/Assignment3/Q3/clouethix-configmap/kube$ curl http://192.168.49.2:30010
+<html>
+<body>
+<h1>I am Cloudethix Team, Are you ?!!</h1>
+Version: 1.1
+</body>
+</html>
+
+=====================================================================================================================================================================
+
+Que 4 →
+● Create 1 Public Docker Hub registry named cloudethix_multicontainer_yourname.
+● Clone below repository on your system.
+https://github.com/janakiramm/Kubernetes-multi-container-pod.git
+● Initialize a local repository & copy the code from above repo to your local repository in
+any of your working branches.
+● Once code is copied , go to the Build directory and build docker image from docker file
+and add meaningful tags and push to docker hub repository.
+● Now go to the deploy directory and notice the files.
+● Here, web-pod-1.yml file will create the pod with two containers (Multi container). Take a
+note of lables , name of containers and ports. Also, please make sure you will update the
+python container image that you have pushed to your docker registry.
+● Now, open web-svc.yml file and notice service Type , selectors & targetPort. Apply the
+file.
+● Now open db-pod.yml & notice the lables , name , Image, containerPort and apply the
+file.
+● Now open the db-svc.yml file and notice service Type , selectors & targetPort. Apply the
+file.
+● Once above files are applied , Check that the Pods and Services are created using
+command line or lens.
+● Now , from the command line run below urls & notice the changes.
+# curl http://$NODE_IP:$NODE_PORT/init
+Initialize the database with sample schema
+● Now it's time to Insert some sample data. Make sure you will use correct
+$NODE_IP:$NODE_PORT
+# curl -i -H "Content-Type: application/json" -X POST -d '{"uid": "1",
+"user":"John Doe"}' http://$NODE_IP:$NODE_PORT/users/add
+# curl -i -H "Content-Type: application/json" -X POST -d '{"uid": "2",
+"user":"Jane Doe"}' http://$NODE_IP:$NODE_PORT/users/add
+# curl -i -H "Content-Type: application/json" -X POST -d '{"uid": "3",
+"user":"Bill Colls"}' http://$NODE_IP:$NODE_PORT/users/add
+# curl -i -H "Content-Type: application/json" -X POST -d '{"uid": "4",
+"user":"Mike Taylor"}' http://$NODE_IP:$NODE_PORT/users/add
+● Now access the data that we have added to database using below command.
+# curl http://$NODE_IP:$NODE_PORT/users/1
+● The second time you access the data, it appends '(c)' indicating that it is pulled from the
+Redis cache.
+● Also, try to access mysql shell i.e db pod & run select * from the users table. check
+app.py for DB related information.
+● Prepare proper documentation in brief & write start to end flow. Refer below link if you
+face any issues.
+https://github.com/janakiramm/Kubernetes-multi-container-pod
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:Deploy$ ls
+db-pod.yml  db-svc.yml  web-pod-1.yml  web-pod-2.yml  web-rc.yml  web-svc.yml
+
+avej_lanjekar@AvejLanjekar:Deploy$ cat web-pod-1.yml
+apiVersion: "v1"
+kind: Pod
+metadata:
+  name: web1
+  labels:
+    name: web
+    app: demo
+spec:
+  containers:
+    - name: redis
+      image: redis
+      ports:
+        - containerPort: 6379
+          name: redis
+          protocol: TCP
+    - name: python
+      image: avejlanjekar45/cloudethix_multicontainer_avej
+      env:
+        - name: "REDIS_HOST"
+          value: "localhost"
+      ports:
+        - containerPort: 5000
+          name: http
+          protocol: TCP
+		  
+avej_lanjekar@AvejLanjekar:Deploy$ cat web-svc.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    name: web
+    app: demo
+spec:
+  selector:
+    name: web
+  type: NodePort
+  ports:
+   - port: 80
+     name: http
+     targetPort: 5000
+     protocol: TCP
+
+avej_lanjekar@AvejLanjekar:Deploy$ kubectl apply -f web-pod-1.yml
+pod/web1 created
+avej_lanjekar@AvejLanjekar:Deploy$ kubectl apply -f web-svc.yml
+service/web created
+
+avej_lanjekar@AvejLanjekar:Deploy$ cat db-pod.yml
+apiVersion: "v1"
+kind: Pod
+metadata:
+  name: mysql
+  labels:
+    name: mysql
+    app: demo
+spec:
+  containers:
+    - name: mysql
+      image: mysql:5.7.25
+      ports:
+        - containerPort: 3306
+          protocol: TCP
+      env:
+        -
+          name: "MYSQL_ROOT_PASSWORD"
+          value: "password"
+
+avej_lanjekar@AvejLanjekar:Deploy$ kubectl apply -f db-pod.yml
+pod/mysql created
+
+avej_lanjekar@AvejLanjekar:Deploy$ cat db-svc.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  labels:
+    name: mysql
+    app: demo
+spec:
+  ports:
+  - port: 3306
+    name: mysql
+    targetPort: 3306
+  selector:
+    name: mysql
+    app: demo
+
+avej_lanjekar@AvejLanjekar:Deploy$ kubectl apply -f db-svc.yml
+service/mysql configured
+
+avej_lanjekar@AvejLanjekar:Deploy$ minikube service web --url
+http://127.0.0.1:46311
+❗  Because you are using a Docker driver on linux, the terminal needs to be open to run it.
+
+avej_lanjekar@AvejLanjekar:~$ curl http://127.0.0.1:46311/init
+DB Init done
+
+avej_lanjekar@AvejLanjekar:~$ curl -i -H "Content-Type: application/json" -X POST -d '{"uid": "2",
+"user":"Jane Doe"}' http://127.0.0.1:46311/users/add
+HTTP/1.0 200 OK
+Content-Type: application/json
+Content-Length: 5
+Server: Werkzeug/1.0.1 Python/2.7.15
+Date: Thu, 03 Sep 2026 05:42:48 GMT
+
+Addedavej_lanjekar@AvejLanjekar:~$
+avej_lanjekar@AvejLanjekar:~$ curl -i -H "Content-Type: application/json" -X POST -d '{"uid": "3",
+"user":"Bill Colls"}' http://127.0.0.1:46311/users/add
+HTTP/1.0 200 OK
+Content-Type: application/json
+Content-Length: 5
+Server: Werkzeug/1.0.1 Python/2.7.15
+Date: Thu, 03 Sep 2026 05:43:13 GMT
+
+avej_lanjekar@AvejLanjekar:~$ curl -i -H "Content-Type: application/json" -X POST -d '{"uid": "4",
+"user":"Mike Taylor"}' http://127.0.0.1:46311/users/add
+HTTP/1.0 200 OK
+Content-Type: application/json
+Content-Length: 5
+Server: Werkzeug/1.0.1 Python/2.7.15
+Date: Thu, 03 Sep 2026 05:43:34 GMT
+
+avej_lanjekar@AvejLanjekar:~$ curl http://127.0.0.1:46311/users/1
+John Doe
+
+avej_lanjekar@AvejLanjekar:~$ curl http://127.0.0.1:46311/users/1
+John Doe(c)
+
+avej_lanjekar@AvejLanjekar:~$ kubectl exec -it mysql -- mysql -uroot -ppassword
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 4
+Server version: 5.7.25 MySQL Community Server (GPL)
+
+Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| USERDB             |
+| mysql              |
+| performance_schema |
+| sys                |
++--------------------+
+5 rows in set (0.01 sec)
+
+mysql> use information_schema
+Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
+
+Database changed
+mysql>
+mysql> show tables;
++---------------------------------------+
+| Tables_in_information_schema          |
++---------------------------------------+
+| CHARACTER_SETS                        |
+| COLLATIONS                            |
+| COLLATION_CHARACTER_SET_APPLICABILITY |
+| COLUMNS                               |
+| COLUMN_PRIVILEGES                     |
+| ENGINES                               |
+| EVENTS                                |
+| FILES                                 |
+| GLOBAL_STATUS                         |
+| GLOBAL_VARIABLES                      |
+| KEY_COLUMN_USAGE                      |
+| OPTIMIZER_TRACE                       |
+| PARAMETERS                            |
+| PARTITIONS                            |
+| PLUGINS                               |
+| PROCESSLIST                           |
+| PROFILING                             |
+| REFERENTIAL_CONSTRAINTS               |
+| ROUTINES                              |
+| SCHEMATA                              |
+| SCHEMA_PRIVILEGES                     |
+| SESSION_STATUS                        |
+| SESSION_VARIABLES                     |
+| STATISTICS                            |
+| TABLES                                |
+| TABLESPACES                           |
+| TABLE_CONSTRAINTS                     |
+| TABLE_PRIVILEGES                      |
+| TRIGGERS                              |
+| USER_PRIVILEGES                       |
+| VIEWS                                 |
+| INNODB_LOCKS                          |
+| INNODB_TRX                            |
+| INNODB_SYS_DATAFILES                  |
+| INNODB_FT_CONFIG                      |
+| INNODB_SYS_VIRTUAL                    |
+| INNODB_CMP                            |
+| INNODB_FT_BEING_DELETED               |
+| INNODB_CMP_RESET                      |
+| INNODB_CMP_PER_INDEX                  |
+| INNODB_CMPMEM_RESET                   |
+| INNODB_FT_DELETED                     |
+| INNODB_BUFFER_PAGE_LRU                |
+| INNODB_LOCK_WAITS                     |
+| INNODB_TEMP_TABLE_INFO                |
+| INNODB_SYS_INDEXES                    |
+| INNODB_SYS_TABLES                     |
+| INNODB_SYS_FIELDS                     |
+| INNODB_CMP_PER_INDEX_RESET            |
+| INNODB_BUFFER_PAGE                    |
+| INNODB_FT_DEFAULT_STOPWORD            |
+| INNODB_FT_INDEX_TABLE                 |
+| INNODB_FT_INDEX_CACHE                 |
+| INNODB_SYS_TABLESPACES                |
+| INNODB_METRICS                        |
+| INNODB_SYS_FOREIGN_COLS               |
+| INNODB_CMPMEM                         |
+| INNODB_BUFFER_POOL_STATS              |
+| INNODB_SYS_COLUMNS                    |
+| INNODB_SYS_FOREIGN                    |
+| INNODB_SYS_TABLESTATS                 |
++---------------------------------------+
+61 rows in set (0.00 sec)
+
+mysql> select * from users;
+ERROR 1109 (42S02): Unknown table 'users' in information_schema
+mysql> use USERDB;
+Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
+
+Database changed
+mysql>
+mysql>
+mysql> show tables;
++------------------+
+| Tables_in_USERDB |
++------------------+
+| users            |
++------------------+
+1 row in set (0.00 sec)
+
+mysql> select * from users;
++------+-------------+
+| ID   | USER        |
++------+-------------+
+|    1 | John Doe    |
+|    2 | Jane Doe    |
+|    3 | Bill Colls  |
+|    4 | Mike Taylor |
++------+-------------+
+4 rows in set (0.00 sec)
+
+mysql>
+
+
+
+
+
+
+
+
+
+==========================================================================================================================================
+Que 5 →
+● Create 1 Public Docker Hub registry named cloudethix_Initcontainer_yourname.
+● Clone below repository on your system.
+https://github.com/janakiramm/simpleapp.git
+● Initialize a local repository & copy the code from above repo to your local repository in
+any of your working branch.
+● Once code is copied , go to the Build directory and build docker image from docker file
+and add meaningful tags and push to docker hub repository.
+● Once Images are pushed to Docker hub registries, create a directory named kube.
+Inside the kube directory create deployement.yaml file with 3 replication , label app:
+simpleapp-webapp , containerPort: 80 and add the image that you have pushed in
+Docker Hub registry.
+● Create one service.yaml file with type nodeport & select simpleapp-webapp pod with port
+80 & targetPort 80 with any nodePort between range 30000-32768.
+● Open the webpage in the browser and notice the changes and capture the snap.
+● Then delete the deployment that you have just created.
+● Update the deployment.yaml file and add volumeMounts with mountPath
+/usr/share/nginx/html from emptyDir: {} volume.
+● Once above changes are added, add initContainers block with below parameters. Also
+add volumeMounts for Init Container with mountPath "/work-dir" from emptyDir: {}
+volume.
+initContainers:
+- name: install
+image: busybox:1.28
+command:
+- wget
+- "-O"
+- "/work-dir/index.html"
+- http://info.cern.ch
+volumeMounts:
+- name: workdir
+mountPath: "/work-dir"
+● Add volumes with emptyDir: {} in deployment.yaml file.
+● Once the deployment.yaml file is ready, create the deployment & access the page in the
+browser and notice the changes.
+
+----------------------------------------------------------------------------------------------------------------------------------------------------
+
+avej_lanjekar@AvejLanjekar:simpleapp$ ls
+Dockerfile  html  wrapper.sh
+
+avej_lanjekar@AvejLanjekar:simpleapp$ mkdir kube
+
+avej_lanjekar@AvejLanjekar:simpleapp$ cd kube/
+
+avej_lanjekar@AvejLanjekar:kube$ cat deployment.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: init-cont-deplo
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: simpleapp-webapp
+
+  template:
+    metadata:
+      labels:
+        app: simpleapp-webapp
+    spec:
+      containers:
+        - name: init-cont
+          image: avejlanjekar45/cloudethix_initcontainer_avej
+          ports:
+            - containerPort: 80
+
+
+avej_lanjekar@AvejLanjekar:kube$ cat service.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: init-service
+spec:
+  type: NodePort
+  selector:
+    app: simpleapp-webapp
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 32000
+	  
+avej_lanjekar@AvejLanjekar:kube$ kubectl apply -f service.yml
+service/init-service created
+
+avej_lanjekar@AvejLanjekar:kube$ kubectl get svc init-service
+NAME           TYPE       CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+init-service   NodePort   10.99.78.194   <none>        80:32000/TCP   9s
+
+avej_lanjekar@AvejLanjekar:kube$ minikube ip
+192.168.49.2
+
+avej_lanjekar@AvejLanjekar:kube$ curl http://192.168.49.2:32000
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sample Deployment</title>
+  <style>
+    body {
+      color: #ffffff;
+      background-color: blue;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+    }
+
+    h1 {
+      font-size: 500%;
+      font-weight: normal;
+      margin-bottom: 0;
+    }
+
+    h2 {
+      font-size: 200%;
+      font-weight: normal;
+      margin-bottom: 0;
+    }
+  </style>
+</head>
+<body>
+  <div align="center">
+    <h1>Welcome to V1 of the web application</h1>
+    <h2>This application will be deployed on Kubernetes.</h2>
+  </div>
+</body>
+</html>
+
+avej_lanjekar@AvejLanjekar:kube$ kubectl delete -f deployment.yml
+deployment.apps "init-cont-deplo" deleted from default namespace
+
+avej_lanjekar@AvejLanjekar:kube$ vim deployment.yml
+avej_lanjekar@AvejLanjekar:kube$ cat deployment.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: init-cont-deplo
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: simpleapp-webapp
+
+  template:
+    metadata:
+      labels:
+        app: simpleapp-webapp
+    spec:
+      initContainers:
+        - name: install
+          image: busybox:1.28
+          command:
+            - wget
+            - -O
+            - /work-dir/index.html
+            - http://info.cern.ch
+          volumeMounts:
+            - name: workdir
+              mountPath: /work-dir
+
+      containers:
+        - name: init-cont
+          image: avejlanjekar45/cloudethix_initcontainer_avej
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: workdir
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: workdir
+          emptyDir: {}
+
+avej_lanjekar@AvejLanjekar:kube$ kubectl apply -f deployment.yml
+deployment.apps/init-cont-deplo created
+
+avej_lanjekar@AvejLanjekar:kube$ curl http://192.168.49.2:32000
+<html><head></head><body><header>
+<title>http://info.cern.ch</title>
+</header>
+
+<h1>http://info.cern.ch - home of the first website</h1>
+<p>From here you can:</p>
+<ul>
+<li><a href="http://info.cern.ch/hypertext/WWW/TheProject.html">Browse the first website</a></li>
+<li><a href="http://line-mode.cern.ch/www/hypertext/WWW/TheProject.html">Browse the first website using the line-mode browser simulator</a></li>
+<li><a href="http://home.web.cern.ch/topics/birth-web">Learn about the birth of the web</a></li>
+<li><a href="http://home.web.cern.ch/about">Learn about CERN, the physics laboratory where the web was born</a></li>
+</ul>
+</body></html>
+
+
+=================================================================================================================================================================
+6 Create 1 Public Docker Hub registry named cloudethix_hpa_yourname.
+● Clone below repository on your system.
+https://github.com/vivekamin/kubernetes-hpa-example.git
+● Initialize a local repository & copy the code from above repo to your local repository in
+any of your working branch.
+● Once code is copied , build a docker image from the docker file and add meaningful tags
+and push to the docker hub repository.
+● Once the image is pushed, go to k8s directory and update deployment.yaml file with
+image name from your repo. And then create it.
+● Open service.yml and change the type to nodePort and apply the same.
+● Open the HPA.yaml file, notice it and then apply the same.
+● Open the browser, and access the webpage.
+● Now it's time to test the HPA working with the below command.
+# kubectl run -i --tty load-generator --rm --image=busybox --restart=Never --
+/bin/sh -c "while sleep 0.01; do wget -q -O- http://NODE_PORT_SERVICE_NAME;
+done"
+● Check the HPA from kubectl command and also check if the deployment is scaling up
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+avej_lanjekar@AvejLanjekar:kubernetes-hpa-example$ ls
+Dockerfile  README.md  k8s  package.json  src
+
+avej_lanjekar@AvejLanjekar:kubernetes-hpa-example$ cd k8s/
+
+avej_lanjekar@AvejLanjekar:k8s$ ls
+deployment.yml  hpa.yml  service.yml
+
+avej_lanjekar@AvejLanjekar:k8s$ cat deployment.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-example
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: node-example
+    spec:
+      containers:
+      - name: node-example
+        image: avejlanjekar45/cloudethix_hpa_avej
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+        resources:
+            limits:
+              cpu: "0.5"
+            requests:
+              cpu: "0.25"
+			  
+avej_lanjekar@AvejLanjekar:k8s$ cat service.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-example
+  labels:
+    app: node-example
+spec:
+  selector:
+    app: node-example
+  ports:
+  - port: 3000
+    protocol: TCP
+    nodePort: 30001
+  type: NodePort
+  
+avej_lanjekar@AvejLanjekar:k8s$ kubectl apply -f service.yml
+service/node-example created
+
+avej_lanjekar@AvejLanjekar:k8s$ cat hpa.yml
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  annotations:
+  name: node-example
+  namespace: default
+spec:
+  maxReplicas: 4
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: extensions/v1
+    kind: Deployment
+    name: node-example
+  targetCPUUtilizationPercentage: 1
+  
+avej_lanjekar@AvejLanjekar:k8s$ kubectl apply -f hpa.yml
+horizontalpodautoscaler.autoscaling/node-example created
+
+avej_lanjekar@AvejLanjekar:k8s$ curl http://192.168.49.2:30001
+Hello World!!
+
+kubectl run -i --tty load-generator --rm --image=busybox --restart=Never --
+/bin/sh -c "while sleep 0.01; do wget -q -O- http://node-example;
+done"
+/ # All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+/ #
+
+avej_lanjekar@AvejLanjekar:~$ kubectl get hpa -w
+NAME           REFERENCE                 TARGETS      MINPODS   MAXPODS   REPLICAS   AGE
+node-example   Deployment/node-example   cpu: 0%/1%   1         4         1          4m40s
+node-example   Deployment/node-example   cpu: 0%/1%   1         4         1          5m5s
+
+=============================================================================================================================================================
+
+7 →
+● Create 1 Public Docker Hub registry named cloudethix_cronjob_yourname.
+● Initialize a local repository & copy below code (three files) to your local repository in any
+of your working branch.
+● Once code is copied, build the docker image from Dockerfile , add meaningful tags and
+then push the docker image to Docker hub registry.
+● Now update the pythoncronjob.yml file to change the image name that you have just
+pushed to docker hub registry.
+● Now create a cron job using pythoncronjob.yml file. Check with kubectl command if the
+cron job is created.
+● Check the Job name which is created by cronjob from command line or lens.
+● Then check the pod logs which are created by the job and capture the output
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+avej_lanjekar@AvejLanjekar:cloudethix_cronjob$ ls
+Dockerfile  helloworld.py  pythoncronjob.yml
+
+avej_lanjekar@AvejLanjekar:cloudethix_cronjob$ cat Dockerfile
+FROM python:3.7-alpine
+#add user group and ass user to that group
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+#creates work dir
+WORKDIR /app
+#copy python script to the container folder app
+COPY helloworld.py /app/helloworld.py
+RUN chmod +x /app/helloworld.py
+#user is appuser
+USER appuser
+ENTRYPOINT ["python", "/app/helloworld.py"]
+
+
+avej_lanjekar@AvejLanjekar:cloudethix_cronjob$ cat helloworld.py
+#!/usr/local/bin/python3
+import datetime
+x = datetime.datetime.now()
+print("Welcome to the Cloudethix World")
+print("Today is")
+print(x)
+
+avej_lanjekar@AvejLanjekar:cloudethix_cronjob$ cat pythoncronjob.yml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: python-helloworld
+spec:
+  schedule: "*/1 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: python-helloworld
+              image: avejlanjekar45/cloudethix_cronjob_avej
+              command: ["python","/app/helloworld.py"]
+          restartPolicy: OnFailure
+
+avej_lanjekar@AvejLanjekar:cloudethix_cronjob$ docker build -t cronjob .
+STEP 1/7: FROM python:3.7-alpine
+Resolved "python" as an alias (/etc/containers/registries.conf.d/shortnames.conf)
+Trying to pull docker.io/library/python:3.7-alpine...
+Getting image source signatures
+Copying blob 96526aa774ef done   |
+Copying blob ea1518237b37 done   |
+Copying blob 9875af95546d done   |
+Copying blob 4819c95424fc done   |
+Copying blob 148762f75a1f done   |
+Copying config 1bac8ae77e done   |
+Writing manifest to image destination
+STEP 2/7: RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+--> 38b117328542
+STEP 3/7: WORKDIR /app
+--> 6438ab034fa9
+STEP 4/7: COPY helloworld.py /app/helloworld.py
+--> 63e924043b9b
+STEP 5/7: RUN chmod +x /app/helloworld.py
+--> a92c7ffe4a8c
+STEP 6/7: USER appuser
+--> 07de10ce0353
+STEP 7/7: ENTRYPOINT ["python", "/app/helloworld.py"]
+COMMIT cronjob
+--> c41e700fdbd7
+Successfully tagged localhost/cronjob:latest
+c41e700fdbd76e0d5f291dbc4565caeec8cc244dfbddd17cf411ef37ac23c0ac
+
+
+avej_lanjekar@AvejLanjekar:cloudethix_cronjob$ docker tag cronjob avejlanjekar45/cloudethix_cronjob_avej
+
+avej_lanjekar@AvejLanjekar:cloudethix_cronjob$ docker push avejlanjekar45/cloudethix_cronjob_avej
+Getting image source signatures
+Copying blob 5795f33d6724 done   |
+Copying blob 148762f75a1f skipped: already exists
+Copying blob ea1518237b37 skipped: already exists
+Copying blob 4819c95424fc skipped: already exists
+Copying blob 734bd37c36be done   |
+Copying blob 96526aa774ef skipped: already exists
+Copying blob 734bd37c36be done   |
+Copying blob 9875af95546d skipped: already exists
+Copying config c41e700fdb done   |
+Writing manifest to image destination
+
+avej_lanjekar@AvejLanjekar:cloudethix_cronjob$ kubectl apply -f pythoncronjob.yml
+cronjob.batch/python-helloworld created
+
+
+
+avej_lanjekar@AvejLanjekar:cloudethix_cronjob$ kubectl get jobs -w
+NAME                         STATUS    COMPLETIONS   DURATION   AGE
+python-helloworld-29807008   Running   0/1                      0s
+python-helloworld-29807008   Running   0/1           0s         0s
+python-helloworld-29807008   SuccessCriteriaMet   0/1           18s        18s
+python-helloworld-29807008   Complete             1/1           17s        18s
+python-helloworld-29807009   Running              0/1                      0s
+python-helloworld-29807009   Running              0/1           0s         0s
+python-helloworld-29807009   SuccessCriteriaMet   0/1           5s         5s
+python-helloworld-29807009   Complete             1/1           5s         5s
+python-helloworld-29807010   Running              0/1                      0s
+python-helloworld-29807010   Running              0/1           0s         0s
+python-helloworld-29807010   SuccessCriteriaMet   0/1           6s         6s
+python-helloworld-29807010   Complete             1/1           6s         6s
+
+
+avej_lanjekar@AvejLanjekar:cloudethix_cronjob$ kubectl get pods
+NAME                               READY   STATUS                  RESTARTS         AGE
+python-helloworld-29807008-fd8kr   0/1     Completed               0                2m46s
+python-helloworld-29807009-frxgq   0/1     Completed               0                106s
+python-helloworld-29807010-kxb9m   0/1     Completed               0                46s
+
+avej_lanjekar@AvejLanjekar:cloudethix_cronjob$ kubectl get jobs
+NAME                         STATUS     COMPLETIONS   DURATION   AGE
+python-helloworld-29807009   Complete   1/1           5s         2m14s
+python-helloworld-29807010   Complete   1/1           6s         74s
+python-helloworld-29807011   Complete   1/1           6s         14s
+avej_lanjekar@AvejLanjekar:cloudethix_cronjob$
