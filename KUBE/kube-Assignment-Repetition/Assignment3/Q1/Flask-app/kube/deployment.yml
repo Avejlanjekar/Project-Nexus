@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-app-deploy
+  namespace: ns-2
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: flask-webapp
+  template:
+    metadata:
+      labels:
+        app: flask-webapp
+    spec:
+      containers:
+        - name: flask-app
+          image: avejlanjekar45/flask_webapp_avej:version-2
+          ports:
+            - containerPort: 8080

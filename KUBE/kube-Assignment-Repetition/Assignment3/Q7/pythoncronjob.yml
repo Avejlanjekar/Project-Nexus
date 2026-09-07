@@ -1,0 +1,15 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: python-helloworld
+spec:
+  schedule: "*/1 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: python-helloworld
+              image: avejlanjekar45/cloudethix_cronjob_avej
+              command: ["python","/app/helloworld.py"]
+          restartPolicy: OnFailure

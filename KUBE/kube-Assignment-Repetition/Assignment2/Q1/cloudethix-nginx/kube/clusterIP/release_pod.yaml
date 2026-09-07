@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: release-nginx
+  namespace: ns-2
+  labels:
+    app: release-nginx
+spec:
+  containers:
+    - name: release-nginx
+      image: avejlanjekar45/cloudethix_release_nginx_avej
+      ports:
+        - containerPort: 80

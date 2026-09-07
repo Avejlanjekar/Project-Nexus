@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: init-cont-deploy
+  namespace: ns-2
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: simpleapp-webapp
+  template:
+    metadata:
+      labels:
+        app: simpleapp-webapp
+    spec:
+      initContainers:
+        - name: install
+          image: busybox
+          command:
+            - wget
+            - -O
+            - /work-dir/index.html
+            - http://info.cern.ch
+          volumeMounts:
+            - name: persistent-storage
+              mountPath: /work-dir
+
+      containers:
+        - name: simpleapp-webapp
+          image: avejlanjekar45/cloudethix_initcontainer_avej
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: persistent-storage
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: persistent-storage
+          emptyDir: {}

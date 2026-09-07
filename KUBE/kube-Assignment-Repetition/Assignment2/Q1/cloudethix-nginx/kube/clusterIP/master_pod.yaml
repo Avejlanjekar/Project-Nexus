@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: master-nginx
+  namespace: ns-2
+  labels:
+    app: master-nginx
+spec:
+  containers:
+    - name: master-nginx
+      image: avejlanjekar45/cloudethix_master_nginx_avejlanjekar
+      ports:
+        - containerPort: 80
