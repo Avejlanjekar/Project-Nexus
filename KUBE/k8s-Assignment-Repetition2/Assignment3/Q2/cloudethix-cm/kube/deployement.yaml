@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-webapp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: frontend-webapp
+  template:
+    metadata:
+      labels:
+        app: frontend-webapp
+    spec:
+      containers:
+        - name: frontend-webapp
+          image: avejlanjekar45/cloudethix_configmap_avej
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: persistent-storage
+              mountPath: /usr/share/nginx/html/
+      volumes:
+        - name: persistent-storage
+          configMap:
+            name: cloudethix-cm
+
