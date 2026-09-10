@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.4
-FROM rust:buster AS base
+FROM docker.io/library/rust:1.88-bookworm AS base
 
 ENV USER=root
 ENV ROCKET_ADDRESS=0.0.0.0
@@ -38,7 +38,7 @@ FROM base AS builder
 
 RUN cargo build --release --offline
 
-FROM debian:buster-slim
+FROM docker.io/library/debian:bookworm-slim
 
 ENV ROCKET_ENV=production
 

@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app3-backend-deployment
+  namespace: app3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: avejlanjekar45/react-java-mysql-backend
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: db-password
+              mountPath: /run/secrets/db-password
+              subPath: MYSQL_ROOT_PASSWORD 
+          env:
+            - name: MYSQL_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app3-cm
+                  key: MYSQL_HOST
+
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app3-secret
+                  key: MYSQL_ROOT_PASSWORD
+
+      volumes:
+        - name: db-password
+          secret:
+            secretName: app3-secret
+

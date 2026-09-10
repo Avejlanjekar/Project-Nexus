@@ -5,17 +5,6 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: app1.avej.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: proxy
-                port:
-                  number: 80
-
     - host: app2.avej.com
       http:
         paths:
@@ -26,4 +15,3 @@ spec:
                 name: frontend-service
                 port:
                   number: 80
-
