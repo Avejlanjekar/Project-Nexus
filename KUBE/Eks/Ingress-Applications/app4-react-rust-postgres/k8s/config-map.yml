@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app4-cm
+  namespace: app4
+data:
+  ADDRESS: 0.0.0.0:8000
+  RUST_LOG: debug
+  PG_DBNAME: postgres
+  PG_HOST: app4-db-service
+  PG_USER: postgres
+

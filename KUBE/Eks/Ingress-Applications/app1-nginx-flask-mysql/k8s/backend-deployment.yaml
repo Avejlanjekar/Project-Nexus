@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bacekend-deployment
+  namespace: app1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: avejlanjekar45/nginx-flask-mysql-backend:v2
+          ports:
+            - containerPort: 8000
+          volumeMounts:
+            - name: db-password
+              mountPath: /run/secrets/db-password
+          
+      volumes:
+        - name: db-password
+          secret:
+            secretName: app1-secret
+            
+
+

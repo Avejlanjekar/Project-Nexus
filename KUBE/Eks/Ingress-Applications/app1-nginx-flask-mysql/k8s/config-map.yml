@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app1-cm
+  namespace: app1
+data:
+  MYSQL_DATABASE: example
