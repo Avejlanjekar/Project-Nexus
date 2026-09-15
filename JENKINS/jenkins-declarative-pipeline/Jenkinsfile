@@ -1,0 +1,34 @@
+pipeline {
+    agent any
+    parameters {
+        string(
+            name: 'Name',
+            defaultValue: 'aves',
+            description: 'enter the name'
+        )
+        string(
+            name: 'LastName',
+            defaultValue: 'lan',
+            description: 'enter last name'
+        )
+        booleanParam(
+            name: 'show',
+            defaultValue: true
+        )
+    }
+
+    stages{
+        stage ('Display parameters'){
+            steps{
+                echo "first name: ${params.Name}"
+                echo "Last name: ${params.LastName}"
+                echo "show: ${params.show}"
+            }
+        }
+        stage ('Run script'){
+            steps{
+                sh './first_jenkins.sh "$Name" "$LastName" "$show"'
+            }
+        }
+    }
+}
