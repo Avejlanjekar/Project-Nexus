@@ -1,0 +1,153 @@
+def buildAndPushImage(String BACKEND_IMAGE, String DH_CREDENTIALS, String Buildcontext){
+    def backend= docker.build("${BACKEND_IMAGE}:${GIT_COMMIT}","${Buildcontext}")
+
+    docker.withRegistry("${env.REGISTRY_URL}","${DH_CREDENTIALS}"){
+        backend.push()
+    }
+}
+
+def promoteImage(String sourceImage, String targetImage, String source_DH_Credentials, String target_DH_Credentials){
+    docker.withRegistry("${env.REGISTRY_URL}","${source_DH_Credentials}"){
+        docker.image("${sourceImage}:${GIT_COMMIT}").pull()
+    }
+
+    sh "docker tag ${sourceImage}:${GIT_COMMIT} ${targetImage}:${GIT_COMMIT}"
+
+    docker.withRegistry("${env.REGISTRY_URL}","${target_DH_Credentials}"){
+        docker.image("${targetImage}:${GIT_COMMIT}").push()
+    }
+}
+
+def deployToEks(String cluster_credentials, String namespace, String environment){
+    withKubeConfig(credentialsId: "${cluster_credentials}", namespace: "${namespace}"){
+        sh "echo deploying to ${namespace} namespace..."
+        sh "sed -i -e 's/{{ENV}}/${environment}/g' -e 's/{{COMMITID}}/${env.GIT_COMMIT}/g' k8s/mariadb-deployment.yml "
+        sh 'kubectl apply -f k8s/secret.yml'
+        sh 'kubectl apply -f k8s/mariadb-deployment.yml'
+        sh 'kubectl apply -f k8s/mariadb-service.yml'
+    }
+}
+
+
+
+pipeline{
+    agent any
+
+    environment{
+
+        BUILD_CONTEXT='./db'
+
+        BACKEND_IMAGE_DEV= 'avejlanjekar45/nginx-flask-mysql-db-dev'
+        BACKEND_IMAGE_QA= 'avejlanjekar45/nginx-flask-mysql-db-qa'
+        BACKEND_IMAGE_UAT='avejlanjekar45/nginx-flask-mysql-db-uat'
+        BACKEND_IMAGE_PROD='avejlanjekar45/nginx-flask-mysql-db-prod'
+
+        REGISTRY_URL= 'https://registry.hub.docker.com'
+
+        DEV_DH_CREDENTIALS= 'dockerhub-credentials'
+        QA_DH_CREDENTIALS= 'dockerhub-credentials'
+        UAT_DH_CREDENTIALS= 'dockerhub-credentials'
+        PROD_DH_CREDENTIALS= 'dockerhub-credentials'
+
+        CLUSTER_CREDENTIALS= 'eks-kubeconfig'
+
+        DEV_NS= 'employee-dev'
+        QA_NS= 'employee-qa'
+        UAT_NS= 'employee-uat'
+        PROD_NS= 'employee-prod'
+    }
+
+    parameters{
+        choice(
+            name: 'Environment',
+            choices: ["dev","qa","uat","prod"],
+            description: "Select deployment environment"
+        )
+    }
+
+    stages{
+
+        stage("build & push"){
+            when {
+                expression{
+                    params.Environment == "dev"
+                }
+            }
+            steps{
+                script{
+
+                    buildAndPushImage("${env.BACKEND_IMAGE_DEV}","${env.DEV_DH_CREDENTIALS}","${env.BUILD_CONTEXT}")
+
+                    deployToEks("${env.CLUSTER_CREDENTIALS}","${env.DEV_NS}","${params.Environment}")
+                }
+            }
+        }
+
+        stage("promote image DEV to QA"){
+            when{
+                expression{
+                    params.Environment == "qa"
+                }
+            }
+            steps{
+                script{
+                    
+                    promoteImage("${env.BACKEND_IMAGE_DEV}","${env.BACKEND_IMAGE_QA}","${env.DEV_DH_CREDENTIALS}","${env.QA_DH_CREDENTIALS}")
+
+                    deployToEks("${env.CLUSTER_CREDENTIALS}","${env.QA_NS}","${params.Environment}")
+
+                }
+            }
+        }
+
+        stage("promote image QA to UAT"){
+            when {
+                expression{
+                    params.Environment == "uat"
+                }
+            }
+            steps{
+                script{
+
+                    promoteImage("${env.BACKEND_IMAGE_QA}","${env.BACKEND_IMAGE_UAT}", "${env.QA_DH_CREDENTIALS}","${env.UAT_DH_CREDENTIALS}")
+
+                    deployToEks("${env.CLUSTER_CREDENTIALS}","${env.UAT_NS}","${params.Environment}")
+                }
+            }
+        }
+
+        stage("approval for prod"){
+            when{
+                expression{
+                    params.Environment == 'prod'
+                }
+            }
+            steps{
+                input message: 'Promote the image from UAT to PROD?',
+                      ok: "Promote to PROD"
+            }
+        }
+
+
+        stage("Promote image from UAT to PROD"){
+            when{
+                expression{
+                    params.Environment == "prod"
+                }
+            }
+            steps{
+                script{
+
+                    promoteImage("${env.BACKEND_IMAGE_UAT}","${env.BACKEND_IMAGE_PROD}","${env.UAT_DH_CREDENTIALS}","${env.PROD_DH_CREDENTIALS}")
+
+                    deployToEks("${env.CLUSTER_CREDENTIALS}","${env.PROD_NS}","${params.Environment}")
+                }
+            }
+        }
+    }
+    post{
+        always{
+            deleteDir()
+        }
+    }
+}
