@@ -1,0 +1,49 @@
+
+{
+  "containerDefinitions": [
+    {
+      "name": "react-java-mysql-frontend",
+      "image": "288497659312.dkr.ecr.ap-south-1.amazonaws.com/react-java-mysql-frontend-${ENV}:${COMMIT_ID}",
+      "cpu": 0,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "hostPort": 80,
+          "protocol": "tcp",
+          "name": "react-java-mysql-frontend-80-tcp",
+          "appProtocol": "http"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "BACKEND_HOST",
+          "value": "app3-backend-${ENV}.app3.local"
+        }
+      ],
+      "environmentFiles": [],
+      "mountPoints": [],
+      "volumesFrom": [],
+      "ulimits": [],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/react-Java-Mysql-Frontend",
+          "awslogs-create-group": "true",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "ecs"
+        },
+        "secretOptions": []
+      },
+      "systemControls": []
+    }
+  ],
+  "family": "react-java-mysql-frontend",
+  "executionRoleArn": "arn:aws:iam::288497659312:role/ecsTaskExecutionRole",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "1024",
+  "memory": "2048"
+}

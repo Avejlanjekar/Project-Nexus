@@ -1,0 +1,336 @@
+pipeline {
+    agent any
+
+    environment {
+
+        AWS_REGION = 'ap-south-1'
+        AWS_ACCOUNT_ID = credentials('aws-account-id')
+
+        ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        ECR_REGISTRY_URL = "https://${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+        AWS_CREDENTIALS = 'aws-ecr-credentials'
+        ECR = 'ecr'
+
+        FRONTEND_IMAGE_DEV = 'react-java-mysql-frontend-dev'
+        FRONTEND_IMAGE_QA = 'react-java-mysql-frontend-qa'
+        FRONTEND_IMAGE_UAT = 'react-java-mysql-frontend-uat'
+        FRONTEND_IMAGE_PROD = 'react-java-mysql-frontend-prod'
+
+        BUILD_CONTEXT = './frontend'
+
+        ECS_CLUSTER = 'Application-3-cluster'
+
+        ECS_SERVICE_DEV = 'react-java-mysql-frontend-dev'
+        ECS_SERVICE_QA = 'react-java-mysql-frontend-qa'
+        ECS_SERVICE_UAT = 'react-java-mysql-frontend-uat'
+        ECS_SERVICE_PROD = 'react-java-mysql-frontend-prod'
+
+        ECS_TASK_FAMILY = 'react-java-mysql-frontend'
+    }
+
+    parameters {
+
+        choice(
+            name: 'Environment',
+            choices: ['dev', 'qa', 'uat', 'prod'],
+            description: 'Select the Environment'
+        )
+
+        string(
+            name: 'IMAGE_TAG',
+            defaultValue: '',
+            description: 'provide commit id'
+        )
+    }
+
+    stages {
+
+        stage('Dev - Build & Push') {
+
+            when {
+                expression {
+                    params.Environment == 'dev'
+                }
+            }
+
+            steps {
+
+                script {
+
+                    buildAndPush(
+                        env.FRONTEND_IMAGE_DEV,
+                        env.BUILD_CONTEXT
+                    )
+                }
+            }
+        }
+
+
+        stage('Dev - Deploy to ECS') {
+
+            when {
+                expression {
+                    params.Environment == 'dev'
+                }
+            }
+
+            steps {
+
+                script {
+
+                    deployToECS(
+                        'frontend/task-definition.json',
+                        env.ECS_TASK_FAMILY,
+                        env.ECS_SERVICE_DEV
+                    )
+                }
+            }
+        }
+
+        stage('Promote Dev to QA') {
+
+            when {
+                expression {
+                    params.Environment == 'qa'
+                }
+            }
+
+            steps {
+
+                script {
+
+                    promoteImage(
+                        env.FRONTEND_IMAGE_DEV,
+                        env.FRONTEND_IMAGE_QA
+                    )
+                }
+            }
+        }
+
+
+        stage('QA - Deploy to ECS') {
+
+            when {
+                expression {
+                    params.Environment == 'qa'
+                }
+            }
+
+            steps {
+
+                script {
+
+                    deployToECS(
+                        'frontend/task-definition.json',
+                        env.ECS_TASK_FAMILY,
+                        env.ECS_SERVICE_QA
+                    )
+                }
+            }
+        }
+
+        stage('Promote QA to UAT') {
+
+            when {
+                expression {
+                    params.Environment == 'uat'
+                }
+            }
+
+            steps {
+
+                script {
+
+                    promoteImage(
+                        env.FRONTEND_IMAGE_QA,
+                        env.FRONTEND_IMAGE_UAT
+                    )
+                }
+            }
+        }
+
+
+        stage('UAT - Deploy to ECS') {
+
+            when {
+                expression {
+                    params.Environment == 'uat'
+                }
+            }
+
+            steps {
+
+                script {
+
+                    deployToECS(
+                        'frontend/task-definition.json',
+                        env.ECS_TASK_FAMILY,
+                        env.ECS_SERVICE_UAT
+                    )
+                }
+            }
+        }
+
+        stage('Approval for Prod Deployment') {
+
+            when {
+                expression {
+                    params.Environment == 'prod'
+                }
+            }
+
+            steps {
+
+                input(
+                    message: 'Promote UAT image to PROD?',
+                    ok: 'Proceed'
+                )
+            }
+        }
+
+        stage('Promote UAT to PROD') {
+
+            when {
+                expression {
+                    params.Environment == 'prod'
+                }
+            }
+
+            steps {
+
+                script {
+
+                    promoteImage(
+                        env.FRONTEND_IMAGE_UAT,
+                        env.FRONTEND_IMAGE_PROD
+                    )
+                }
+            }
+        }
+
+
+        stage('PROD - Deploy to ECS') {
+
+            when {
+                expression {
+                    params.Environment == 'prod'
+                }
+            }
+
+            steps {
+
+                script {
+
+                    deployToECS(
+                        'frontend/task-definition.json',
+                        env.ECS_TASK_FAMILY,
+                        env.ECS_SERVICE_PROD
+                    )
+                }
+            }
+        }
+    }
+
+    post {
+
+        always {
+
+            deleteDir()
+        }
+    }
+}
+
+def buildAndPush(String imageRepository, String buildContext) {
+
+    echo "Repository : ${imageRepository}"
+    echo "Commit     : ${env.GIT_COMMIT}"
+
+
+    def image = docker.build(
+        "${env.ECR_REGISTRY}/${imageRepository}:${env.GIT_COMMIT}",
+        buildContext
+    )
+
+
+    docker.withRegistry(
+        "${env.ECR_REGISTRY_URL}",
+        "${env.ECR}:${env.AWS_REGION}:${env.AWS_CREDENTIALS}"
+    ) {
+
+        image.push()
+    }
+
+
+    echo "Image pushed successfully"
+
+    echo "${env.ECR_REGISTRY}/${imageRepository}:${env.GIT_COMMIT}"
+}
+
+def promoteImage(String sourceImage, String targetImage) {
+
+    docker.withRegistry(
+        "${env.ECR_REGISTRY_URL}",
+        "${env.ECR}:${env.AWS_REGION}:${env.AWS_CREDENTIALS}"
+    ) {
+
+        docker.image(
+            "${env.ECR_REGISTRY}/${sourceImage}:${params.IMAGE_TAG}"
+        ).pull()
+    }
+
+    sh """
+        docker tag \
+        ${env.ECR_REGISTRY}/${sourceImage}:${params.IMAGE_TAG} \
+        ${env.ECR_REGISTRY}/${targetImage}:${params.IMAGE_TAG}
+    """
+
+    docker.withRegistry(
+        "${env.ECR_REGISTRY_URL}",
+        "${env.ECR}:${env.AWS_REGION}:${env.AWS_CREDENTIALS}"
+    ) {
+
+        docker.image(
+            "${env.ECR_REGISTRY}/${targetImage}:${params.IMAGE_TAG}"
+        ).push()
+    }
+
+
+    echo "Image promoted successfully"
+
+    echo "${env.ECR_REGISTRY}/${targetImage}:${params.IMAGE_TAG}"
+}
+
+def deployToECS(String taskDefinitionFile, String taskFamily, String ecsService) {
+    
+    if(params.Environment == 'dev'){
+        sh """
+            sed -i 's/\\\${ENV}/${params.Environment}/g' ${taskDefinitionFile}
+            sed -i 's/\\\${COMMIT_ID}/${env.GIT_COMMIT}/g' ${taskDefinitionFile}
+        """
+    }else{
+        sh """
+            sed -i 's/\\\${ENV}/${params.Environment}/g' ${taskDefinitionFile}
+            sed -i 's/\\\${COMMIT_ID}/${params.IMAGE_TAG}/g' ${taskDefinitionFile}
+        """
+    }
+
+    def taskRevision = sh(
+        script: """
+            aws ecs register-task-definition \
+                --cli-input-json file://${taskDefinitionFile} \
+                --region ${env.AWS_REGION} \
+                --query 'taskDefinition.revision' \
+                --output text
+        """,
+        returnStdout: true
+    ).trim()
+
+    sh """
+        aws ecs update-service \
+            --cluster ${env.ECS_CLUSTER} \
+            --service ${ecsService} \
+            --task-definition ${taskFamily}:${taskRevision} \
+            --region ${env.AWS_REGION}
+    """
+}
