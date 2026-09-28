@@ -1,27 +1,23 @@
 {
   "containerDefinitions": [
     {
-      "name": "react-java-mysql-backend",
-      "image": "288497659312.dkr.ecr.ap-south-1.amazonaws.com/react-java-mysql-backend-${ENV}:${COMMIT_ID}",
+      "name": "app4-db",
+      "image": "288497659312.dkr.ecr.ap-south-1.amazonaws.com/app4-db-${ENV}:${COMMIT_ID}",
       "cpu": 0,
       "portMappings": [
         {
-          "containerPort": 8080,
-          "hostPort": 8080,
+          "containerPort": 5432,
+          "hostPort": 5432,
           "protocol": "tcp",
-          "name": "react-java-mysql-backend",
+          "name": "app4-db-5432-tcp",
           "appProtocol": "http"
         }
       ],
       "essential": true,
       "environment": [
         {
-          "name": "MYSQL_ROOT_PASSWORD",
-          "value": "db-57xsl"
-        },
-        {
-          "name": "MYSQL_HOST",
-          "value": "app3-db-${ENV}.app3.local"
+          "name": "POSTGRES_PASSWORD",
+          "value": "mysecretpassword"
         }
       ],
       "environmentFiles": [],
@@ -31,7 +27,7 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/app3-backend",
+          "awslogs-group": "/ecs/app4-db",
           "awslogs-create-group": "true",
           "awslogs-region": "ap-south-1",
           "awslogs-stream-prefix": "ecs"
@@ -41,12 +37,12 @@
       "systemControls": []
     }
   ],
-  "family": "react-java-mysql-backend",
+  "family": "app4-db",
   "executionRoleArn": "arn:aws:iam::288497659312:role/ecsTaskExecutionRole",
   "networkMode": "awsvpc",
   "requiresCompatibilities": [
     "FARGATE"
   ],
-  "cpu": "512",
-  "memory": "1024"
+  "cpu": "1024",
+  "memory": "2048"
 }

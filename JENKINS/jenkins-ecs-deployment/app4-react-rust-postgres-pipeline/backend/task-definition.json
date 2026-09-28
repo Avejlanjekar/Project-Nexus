@@ -1,27 +1,43 @@
 {
   "containerDefinitions": [
     {
-      "name": "react-java-mysql-backend",
-      "image": "288497659312.dkr.ecr.ap-south-1.amazonaws.com/react-java-mysql-backend-${ENV}:${COMMIT_ID}",
+      "name": "app4-backend",
+      "image": "288497659312.dkr.ecr.ap-south-1.amazonaws.com/app4-backend-${ENV}:${COMMIT_ID}",
       "cpu": 0,
       "portMappings": [
         {
-          "containerPort": 8080,
-          "hostPort": 8080,
+          "containerPort": 8000,
+          "hostPort": 8000,
           "protocol": "tcp",
-          "name": "react-java-mysql-backend",
+          "name": "app4-backend-8000-tcp",
           "appProtocol": "http"
         }
       ],
       "essential": true,
       "environment": [
         {
-          "name": "MYSQL_ROOT_PASSWORD",
-          "value": "db-57xsl"
+          "name": "PG_PASSWORD",
+          "value": "mysecretpassword"
         },
         {
-          "name": "MYSQL_HOST",
-          "value": "app3-db-${ENV}.app3.local"
+          "name": "RUST_LOG",
+          "value": "debug"
+        },
+        {
+          "name": "PG_USER",
+          "value": "postgres"
+        },
+        {
+          "name": "ADDRESS",
+          "value": "0.0.0.0:8000"
+        },
+        {
+          "name": "PG_DBNAME",
+          "value": "postgres"
+        },
+        {
+          "name": "PG_HOST",
+          "value": "app4-db-${ENV}.app4.local"
         }
       ],
       "environmentFiles": [],
@@ -31,7 +47,7 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/app3-backend",
+          "awslogs-group": "/ecs/app4-backend",
           "awslogs-create-group": "true",
           "awslogs-region": "ap-south-1",
           "awslogs-stream-prefix": "ecs"
@@ -41,7 +57,7 @@
       "systemControls": []
     }
   ],
-  "family": "react-java-mysql-backend",
+  "family": "app4-backend",
   "executionRoleArn": "arn:aws:iam::288497659312:role/ecsTaskExecutionRole",
   "networkMode": "awsvpc",
   "requiresCompatibilities": [
