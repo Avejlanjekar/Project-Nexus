@@ -1,16 +1,14 @@
 {
   "containerDefinitions": [
     {
-      "name": "employee-db",
-      "image": "288497659312.dkr.ecr.ap-south-1.amazonaws.com/employee-management-db-${ENV}:${COMMIT_ID}",
+      "name": "database",
+      "image": "916921211430.dkr.ecr.ap-south-1.amazonaws.com/app-database-${ENV}:${COMMIT_ID}",
       "cpu": 0,
       "portMappings": [
         {
           "containerPort": 3306,
           "hostPort": 3306,
-          "protocol": "tcp",
-          "name": "employee-db-3306-tcp",
-          "appProtocol": "http"
+          "protocol": "tcp"
         }
       ],
       "essential": true,
@@ -24,29 +22,25 @@
           "value": "db-57xsl"
         }
       ],
-      "environmentFiles": [],
       "mountPoints": [],
       "volumesFrom": [],
-      "ulimits": [],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/Employee-Management-DB",
-          "awslogs-create-group": "true",
+          "awslogs-group": "/ecs/app-database-${ENV}",
           "awslogs-region": "ap-south-1",
-          "awslogs-stream-prefix": "ecs"
-        },
-        "secretOptions": []
+          "awslogs-stream-prefix": "database"
+        }
       },
       "systemControls": []
     }
   ],
-  "family": "employee-management-db",
-  "executionRoleArn": "arn:aws:iam::288497659312:role/ecsTaskExecutionRole",
+  "family": "app-database-${ENV}",
+  "executionRoleArn": "arn:aws:iam::916921211430:role/app-ecs-task-execution-role-${ENV}",
   "networkMode": "awsvpc",
   "requiresCompatibilities": [
     "FARGATE"
   ],
-  "cpu": "1024",
-  "memory": "2048"
+  "cpu": "256",
+  "memory": "512"
 }

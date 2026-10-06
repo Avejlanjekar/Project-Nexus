@@ -1,16 +1,14 @@
 {
   "containerDefinitions": [
     {
-      "name": "employee-backend",
-      "image": "288497659312.dkr.ecr.ap-south-1.amazonaws.com/employee-management-backend-${ENV}:${COMMIT_ID}",
+      "name": "backend",
+      "image": "916921211430.dkr.ecr.ap-south-1.amazonaws.com/app-backend-${ENV}:${COMMIT_ID}",
       "cpu": 0,
       "portMappings": [
         {
           "containerPort": 5000,
           "hostPort": 5000,
-          "protocol": "tcp",
-          "name": "employee-backend-5000-tcp",
-          "appProtocol": "http"
+          "protocol": "tcp"
         }
       ],
       "essential": true,
@@ -21,7 +19,7 @@
         },
         {
           "name": "DB_HOST",
-          "value": "employee-db-${ENV}.employee.local"
+          "value": "database.app-${ENV}.local"
         },
         {
           "name": "DB_PORT",
@@ -36,29 +34,25 @@
           "value": "db-57xsl"
         }
       ],
-      "environmentFiles": [],
       "mountPoints": [],
       "volumesFrom": [],
-      "ulimits": [],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/employee-management-backend",
-          "awslogs-create-group": "true",
+          "awslogs-group": "/ecs/app-backend-${ENV}",
           "awslogs-region": "ap-south-1",
-          "awslogs-stream-prefix": "ecs"
-        },
-        "secretOptions": []
+          "awslogs-stream-prefix": "backend"
+        }
       },
       "systemControls": []
     }
   ],
-  "family": "employee-management-backend",
-  "executionRoleArn": "arn:aws:iam::288497659312:role/ecsTaskExecutionRole",
+  "family": "app-backend-${ENV}",
+  "executionRoleArn": "arn:aws:iam::916921211430:role/app-ecs-task-execution-role-${ENV}",
   "networkMode": "awsvpc",
   "requiresCompatibilities": [
     "FARGATE"
   ],
-  "cpu": "512",
-  "memory": "1024"
+  "cpu": "256",
+  "memory": "512"
 }

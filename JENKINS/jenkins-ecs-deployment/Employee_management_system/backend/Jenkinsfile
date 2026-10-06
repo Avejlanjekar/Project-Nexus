@@ -12,21 +12,29 @@ pipeline {
         AWS_CREDENTIALS = 'aws-ecr-credentials'
         ECR = 'ecr'
 
-        BACKEND_IMAGE_DEV = 'employee-management-backend-dev'
-        BACKEND_IMAGE_QA = 'employee-management-backend-qa'
-        BACKEND_IMAGE_UAT = 'employee-management-backend-uat'
-        BACKEND_IMAGE_PROD = 'employee-management-backend-prod'
+        BACKEND_IMAGE_DEV = 'app-backend-dev'
+        BACKEND_IMAGE_QA = 'app-backend-qa'
+        BACKEND_IMAGE_UAT = 'app-backend-uat'
+        BACKEND_IMAGE_PROD = 'app-backend-prod'
 
         BUILD_CONTEXT = './backend'
 
-        ECS_CLUSTER = 'Employeee_Management_cluster'
+        ECS_CLUSTER_DEV = 'app-ecs-cluster-dev'
+        ECS_CLUSTER_QA = 'app-ecs-cluster-qa'
+        ECS_CLUSTER_UAT = 'app-ecs-cluster-uat'
+        ECS_CLUSTER_PROD = 'app-ecs-cluster-prod'
 
-        ECS_SERVICE_DEV = 'employee-management-backend-dev'
-        ECS_SERVICE_QA = 'employee-management-backend-qa'
-        ECS_SERVICE_UAT = 'employee-management-backend-uat'
-        ECS_SERVICE_PROD = 'employee-management-backend-prod'
+        ECS_SERVICE_DEV = 'app-backend-service-dev'
+        ECS_SERVICE_QA = 'app-backend-service-qa'
+        ECS_SERVICE_UAT = 'app-backend-service-uat'
+        ECS_SERVICE_PROD = 'app-backend-service-prod'
 
-        ECS_TASK_FAMILY = 'employee-management-backend'
+        ECS_TASK_FAMILY_DEV = 'app-backend-dev'
+        ECS_TASK_FAMILY_QA = 'app-backend-qa'
+        ECS_TASK_FAMILY_UAT = 'app-backend-uat'
+        ECS_TASK_FAMILY_PROD = 'app-backend-prod'
+
+        TASK_DEFINITION = 'backend/task-definition.json'
     }
 
     parameters {
@@ -80,9 +88,10 @@ pipeline {
                 script {
 
                     deployToECS(
-                        'backend/task-definition.json',
-                        env.ECS_TASK_FAMILY,
-                        env.ECS_SERVICE_DEV
+                        env.TASK_DEFINITION,
+                        env.ECS_TASK_FAMILY_DEV,
+                        env.ECS_SERVICE_DEV,
+                        env.ECS_CLUSTER_DEV
                     )
                 }
             }
@@ -122,9 +131,10 @@ pipeline {
                 script {
 
                     deployToECS(
-                        'backend/task-definition.json',
-                        env.ECS_TASK_FAMILY,
-                        env.ECS_SERVICE_QA
+                        env.TASK_DEFINITION,
+                        env.ECS_TASK_FAMILY_QA,
+                        env.ECS_SERVICE_QA,
+                        env.ECS_CLUSTER_QA
                     )
                 }
             }
@@ -164,9 +174,10 @@ pipeline {
                 script {
 
                     deployToECS(
-                        'backend/task-definition.json',
-                        env.ECS_TASK_FAMILY,
-                        env.ECS_SERVICE_UAT
+                        env.TASK_DEFINITION,
+                        env.ECS_TASK_FAMILY_UAT,
+                        env.ECS_SERVICE_UAT,
+                        env.ECS_CLUSTER_UAT
                     )
                 }
             }
@@ -223,9 +234,10 @@ pipeline {
                 script {
 
                     deployToECS(
-                        'backend/task-definition.json',
-                        env.ECS_TASK_FAMILY,
-                        env.ECS_SERVICE_PROD
+                        env.TASK_DEFINITION,
+                        env.ECS_TASK_FAMILY_PROD,
+                        env.ECS_SERVICE_PROD,
+                        env.ECS_CLUSTER_PROD
                     )
                 }
             }
@@ -301,7 +313,7 @@ def promoteImage(String sourceImage, String targetImage) {
     echo "${env.ECR_REGISTRY}/${targetImage}:${params.IMAGE_TAG}"
 }
 
-def deployToECS(String taskDefinitionFile, String taskFamily, String ecsService) {
+def deployToECS(String taskDefinitionFile, String taskFamily, String ecsService, String ecsCluster) {
 
     if(params.Environment == 'dev'){
         sh """
@@ -315,22 +327,28 @@ def deployToECS(String taskDefinitionFile, String taskFamily, String ecsService)
         """
     }
 
-    def taskRevision = sh(
-        script: """
-            aws ecs register-task-definition \
-                --cli-input-json file://${taskDefinitionFile} \
-                --region ${env.AWS_REGION} \
-                --query 'taskDefinition.revision' \
-                --output text
-        """,
-        returnStdout: true
-    ).trim()
+    withCredentials([
+        [$class: 'AmazonWebServicesCredentialsBinding',
+         credentialsId: env.AWS_CREDENTIALS]
+    ]){
+        def taskRevision = sh(
 
-    sh """
-        aws ecs update-service \
-            --cluster ${env.ECS_CLUSTER} \
-            --service ${ecsService} \
-            --task-definition ${taskFamily}:${taskRevision} \
-            --region ${env.AWS_REGION}
-    """
+            script: """
+                aws ecs register-task-definition \
+                    --cli-input-json file://${taskDefinitionFile} \
+                    --region ${env.AWS_REGION} \
+                    --query 'taskDefinition.revision' \
+                    --output text
+            """,
+            returnStdout: true
+        ).trim()
+
+        sh """
+            aws ecs update-service \
+                --cluster ${ecsCluster} \
+                --service ${ecsService} \
+                --task-definition ${taskFamily}:${taskRevision} \
+                --region ${env.AWS_REGION}
+        """
+    }
 }
