@@ -191,11 +191,9 @@ DATABASE_ROOT_PASSWORD = "db-57xsl"
 
 FRONTEND_BACKEND_HOST = "backend.app-dev.local"
 
-BACKEND_IMAGE = "916921211430.dkr.ecr.ap-south-1.amazonaws.com/app-backend-dev:4c6d38f59c3f66b9d4551d4658da35af59f58243"
-
-FRONTEND_IMAGE = "916921211430.dkr.ecr.ap-south-1.amazonaws.com/app-frontend-dev:4c6d38f59c3f66b9d4551d4658da35af59f58243"
-
-DATABASE_IMAGE = "916921211430.dkr.ecr.ap-south-1.amazonaws.com/app-database-dev:4c6d38f59c3f66b9d4551d4658da35af59f58243"
+BACKEND_IMAGE = "nginx"
+FRONTEND_IMAGE = "nginx"
+DATABASE_IMAGE = "mysql"
 
 ECS_TASK_CPU = "256"
 

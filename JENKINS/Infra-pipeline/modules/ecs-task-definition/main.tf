@@ -5,7 +5,6 @@ resource "aws_ecs_task_definition" "this_backend" {
   cpu                      = var.ECS_TASK_CPU
   memory                   = var.ECS_TASK_MEMORY
   execution_role_arn       = var.ECS_TASK_EXECUTION_ROLE_ARN
-
   container_definitions = jsonencode([
     {
       name      = var.BACKEND_CONTAINER_NAME
@@ -18,7 +17,6 @@ resource "aws_ecs_task_definition" "this_backend" {
           protocol      = "tcp"
         }
       ]
-
       environment = [
         {
           name  = "DB_NAME"
@@ -41,7 +39,6 @@ resource "aws_ecs_task_definition" "this_backend" {
           value = var.BACKEND_DB_PASSWORD
         }
       ]
-
       logConfiguration = {
         logDriver = "awslogs"
 
@@ -63,30 +60,25 @@ resource "aws_ecs_task_definition" "this_frontend" {
   cpu                      = var.ECS_TASK_CPU
   memory                   = var.ECS_TASK_MEMORY
   execution_role_arn       = var.ECS_TASK_EXECUTION_ROLE_ARN
-
   container_definitions = jsonencode([
     {
       name      = var.FRONTEND_CONTAINER_NAME
       image     = var.FRONTEND_IMAGE
       essential = true
-
       portMappings = [
         {
           containerPort = var.FRONTEND_CONTAINER_PORT
           protocol      = "tcp"
         }
       ]
-
       environment = [
         {
           name  = "BACKEND_HOST"
           value = var.FRONTEND_BACKEND_HOST
         }
       ]
-
       logConfiguration = {
         logDriver = "awslogs"
-
         options = {
           awslogs-group         = var.FRONTEND_LOG_GROUP_NAME
           awslogs-region        = var.AWS_REGION
@@ -105,7 +97,6 @@ resource "aws_ecs_task_definition" "this_database" {
   cpu                      = var.ECS_TASK_CPU
   memory                   = var.ECS_TASK_MEMORY
   execution_role_arn       = var.ECS_TASK_EXECUTION_ROLE_ARN
-
   container_definitions = jsonencode([
     {
       name      = var.DATABASE_CONTAINER_NAME
@@ -118,7 +109,6 @@ resource "aws_ecs_task_definition" "this_database" {
           protocol      = "tcp"
         }
       ]
-
       environment = [
         {
           name  = "MYSQL_DATABASE"
@@ -129,10 +119,8 @@ resource "aws_ecs_task_definition" "this_database" {
           value = var.DATABASE_ROOT_PASSWORD
         }
       ]
-
       logConfiguration = {
         logDriver = "awslogs"
-
         options = {
           awslogs-group         = var.DATABASE_LOG_GROUP_NAME
           awslogs-region        = var.AWS_REGION
