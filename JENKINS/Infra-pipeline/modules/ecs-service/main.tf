@@ -4,6 +4,7 @@ resource "aws_ecs_service" "this_backend" {
   task_definition = var.BACKEND_TASK_DEFINITION_ARN
   desired_count = var.ECS_SERVICE_DESIRED_COUNT
   launch_type   = var.ECS_LAUNCH_TYPE
+  enable_execute_command = true
   network_configuration {
     subnets          = var.ECS_APP_SUBNET_IDS
     security_groups  = [var.ECS_SECURITY_GROUP_ID]
@@ -37,6 +38,7 @@ resource "aws_ecs_service" "this_frontend" {
   task_definition = var.FRONTEND_TASK_DEFINITION_ARN
   desired_count = var.ECS_SERVICE_DESIRED_COUNT
   launch_type   = var.ECS_LAUNCH_TYPE
+  enable_execute_command = true
   network_configuration {
     subnets          = var.ECS_APP_SUBNET_IDS
     security_groups  = [var.ECS_SECURITY_GROUP_ID]
@@ -70,6 +72,7 @@ resource "aws_ecs_service" "this_database" {
   task_definition = var.DATABASE_TASK_DEFINITION_ARN
   desired_count = var.ECS_SERVICE_DESIRED_COUNT
   launch_type   = var.ECS_LAUNCH_TYPE
+  enable_execute_command = true
   network_configuration {
     subnets          = var.ECS_DB_SUBNET_IDS
     security_groups  = [var.DB_SECURITY_GROUP_ID]

@@ -1,4 +1,3 @@
-
 pipeline {
  
     agent any
@@ -18,13 +17,12 @@ pipeline {
     }
  
     environment {
-        AWS_REGION = 'ap-south-1'
+        AWS_REGION         = 'ap-south-1'
         AWS_DEFAULT_REGION = 'ap-south-1'
-        AWS_CREDENTIALS = 'aws-ecr-credentials'
+        AWS_CREDENTIALS    = 'aws-ecr-credentials'
     }
  
     stages {
- 
         stage('Terraform Init') {
             steps {
                 withCredentials([
@@ -39,12 +37,11 @@ pipeline {
  
                         aws sts get-caller-identity
  
-                        terraform init -input=false -reconfigure -backend-config="backend/backend-${params.Environment}.tf"
+                        terraform init -input=false -reconfigure -backend-config="backend_conf/backend-${params.Environment}.conf"
                     """
                 }
             }
         }
- 
         stage('Terraform Validate') {
             when {
                 expression {
@@ -52,7 +49,6 @@ pipeline {
                     params.Terraform_Action == 'apply'
                 }
             }
- 
             steps {
                 withCredentials([
                     [$class: 'AmazonWebServicesCredentialsBinding',
@@ -69,14 +65,12 @@ pipeline {
                 }
             }
         }
- 
         stage('Terraform Plan') {
             when {
                 expression {
                     params.Terraform_Action == 'plan'
                 }
             }
- 
             steps {
                 withCredentials([
                     [$class: 'AmazonWebServicesCredentialsBinding',
@@ -88,19 +82,33 @@ pipeline {
                         echo "Environment: ${params.Environment}"
                         echo "========================================"
  
-                        terraform plan -var-file="environments/${params.Environment}/terraform.tfvars"
+                        terraform plan -var-file="environments/${params.Environment}.tfvars"
                     """
                 }
             }
         }
- 
+        stage('Approval for Apply') {
+
+            when {
+                expression {
+                    params.Terraform_Action == 'apply'
+                }
+            }
+
+            steps {
+
+                input(
+                    message: 'Approve apply?',
+                    ok: 'Proceed'
+                )
+            }
+        }
         stage('Terraform Apply') {
             when {
                 expression {
                     params.Terraform_Action == 'apply'
                 }
             }
- 
             steps {
                 withCredentials([
                     [$class: 'AmazonWebServicesCredentialsBinding',
@@ -112,19 +120,33 @@ pipeline {
                         echo "Environment: ${params.Environment}"
                         echo "========================================"
  
-                        terraform apply -var-file="environments/${params.Environment}/terraform.tfvars" -auto-approve
+                        terraform apply -var-file="environments/${params.Environment}.tfvars" -auto-approve
                     """
                 }
             }
         }
- 
+        stage('Approval for destroy') {
+
+            when {
+                expression {
+                    params.Terraform_Action == 'destroy'
+                }
+            }
+
+            steps {
+
+                input(
+                    message: 'Approve destroy?',
+                    ok: 'Proceed'
+                )
+            }
+        }
         stage('Terraform Destroy') {
             when {
                 expression {
                     params.Terraform_Action == 'destroy'
                 }
             }
- 
             steps {
                 withCredentials([
                     [$class: 'AmazonWebServicesCredentialsBinding',
@@ -136,22 +158,19 @@ pipeline {
                         echo "Environment: ${params.Environment}"
                         echo "========================================"
  
-                        terraform destroy -var-file="environments/${params.Environment}/terraform.tfvars" -auto-approve
+                        terraform destroy -var-file="environments/${params.Environment}.tfvars" -auto-approve
                     """
                 }
             }
         }
     }
- 
     post {
         success {
             echo "Terraform ${params.Terraform_Action} completed successfully for ${params.Environment}"
         }
- 
         failure {
             echo "Terraform ${params.Terraform_Action} failed for ${params.Environment}"
         }
- 
         always {
             cleanWs()
         }
