@@ -1,0 +1,47 @@
+global:
+  environment: dev
+  imageTag: latest
+
+frontend:
+  replicaCount: 1
+  containerName: frontend
+  image:
+    repository: avejlanjekar45/employee-management-frontend
+    tag: latest
+  containerPort: 80
+  service:
+    port: 80
+
+backend:
+  replicaCount: 1
+  containerName: backend
+  image:
+    repository: avejlanjekar45/employee-management-backend
+    tag: latest
+  containerPort: 5000
+  service:
+    port: 5000
+
+database:
+  replicaCount: 1
+  containerName: mysql
+  image:
+    repository: avejlanjekar45/employee-management-database
+    tag: latest
+  containerPort: 3306
+  service:
+    port: 3306
+
+ingress:
+  className: alb
+  host: employee.com
+
+configmap:
+  DB_HOST: mysql
+  DB_PORT: "3306"
+
+secret:
+  MYSQL_ROOT_PASSWORD: cm9vdDEyMw==
+  MYSQL_DATABASE: ZW1wbG95ZWVfZGI=
+  MYSQL_USER: ZW1wbG95ZWVfdXNlcg==
+  MYSQL_PASSWORD: ZW1wbG95ZWUxMjM=
