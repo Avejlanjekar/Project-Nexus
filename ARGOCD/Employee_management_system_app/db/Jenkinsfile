@@ -111,6 +111,8 @@ pipeline{
                         [$class: 'AmazonWebServicesCredentialsBinding',
                         credentialsId: "${env.AWS_CREDENTIALS}"]
                     ]){
+                        sh 'aws sts get-caller-identity'
+                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
                         sh "kubectl apply -f argocd/dev/argocd-config-dev.yaml"
                         sh "kubectl apply -f argocd/dev/argocd-database-dev.yaml"
                     }
@@ -190,6 +192,9 @@ pipeline{
                         [$class: 'AmazonWebServicesCredentialsBinding',
                         credentialsId: "${env.AWS_CREDENTIALS}"]
                     ]){
+                        sh 'aws sts get-caller-identity'
+                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
+
                         sh "kubectl apply -f argocd/qa/argocd-config-qa.yaml"
                         sh "kubectl apply -f argocd/qa/argocd-database-qa.yaml"
                     }
@@ -271,6 +276,8 @@ pipeline{
                         [$class: 'AmazonWebServicesCredentialsBinding',
                         credentialsId: "${env.AWS_CREDENTIALS}"]
                     ]){
+                        sh 'aws sts get-caller-identity'
+                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
                         sh "kubectl apply -f argocd/uat/argocd-config-uat.yaml"
                         sh "kubectl apply -f argocd/uat/argocd-database-uat.yaml"
                     }
@@ -362,6 +369,8 @@ pipeline{
                         [$class: 'AmazonWebServicesCredentialsBinding',
                         credentialsId: "${env.AWS_CREDENTIALS}"]
                     ]){
+                        sh 'aws sts get-caller-identity'
+                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
                         sh "kubectl apply -f argocd/prod/argocd-config-prod.yaml"
                         sh "kubectl apply -f argocd/prod/argocd-database-prod.yaml"
                     }

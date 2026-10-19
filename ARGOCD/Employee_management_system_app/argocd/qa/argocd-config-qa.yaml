@@ -16,7 +16,7 @@ spec:
         - name: component
           value: config
   destination:
-    server: https://C4D0C731063ED074CE90546C04497284.gr7.ap-south-1.eks.amazonaws.com
+    server: https://B425B9BB676CC52478A91ED51A66E46C.gr7.ap-south-1.eks.amazonaws.com
     namespace: employee-qa
   syncPolicy:
     automated:

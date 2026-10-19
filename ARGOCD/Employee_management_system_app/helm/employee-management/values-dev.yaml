@@ -6,17 +6,17 @@ frontend:
   replicaCount: 1
   image:
     repository: avejlanjekar45/employee-management-frontend
-    tag: "3a7ea9bebfdb185a2a33fddb72beeaeec92b942d"
+    tag: "420cb42837df2d6deb4ed42217abd1c7652b83fe"
 backend:
   replicaCount: 1
   image:
     repository: avejlanjekar45/employee-management-backend
-    tag: "7785bd8ddbb87daad9810008b7601440310516ee"
+    tag: "1733883ac6d9d2a65766abbf794bd4c95ec768f2"
 database:
   replicaCount: 1
   image:
     repository: avejlanjekar45/employee-management-database
-    tag: "a84f30c4046055d85a36858bf668af4b7661a04e"
+    tag: "52ad1ed755feadaa43ba45f9b602c4e673aa5323"
 ingress:
   enabled: true
   className: alb

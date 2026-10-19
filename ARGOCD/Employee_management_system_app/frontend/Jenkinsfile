@@ -109,6 +109,7 @@ pipeline{
                         [$class: 'AmazonWebServicesCredentialsBinding',
                         credentialsId: "${env.AWS_CREDENTIALS}"]
                     ]){
+                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
                         sh "kubectl apply -f argocd/dev/argocd-frontend-dev.yaml"
                     }                 
                 }
@@ -185,6 +186,7 @@ pipeline{
                         [$class: 'AmazonWebServicesCredentialsBinding',
                         credentialsId: "${env.AWS_CREDENTIALS}"]
                     ]){
+                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
                         sh "kubectl apply -f argocd/qa/argocd-frontend-qa.yaml"
                     }                  
                 }
@@ -262,6 +264,7 @@ pipeline{
                         [$class: 'AmazonWebServicesCredentialsBinding',
                         credentialsId: "${env.AWS_CREDENTIALS}"]
                     ]){
+                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
                         sh "kubectl apply -f argocd/uat/argocd-frontend-uat.yaml"
                     }                   
                 }
@@ -351,6 +354,7 @@ pipeline{
                         [$class: 'AmazonWebServicesCredentialsBinding',
                         credentialsId: "${env.AWS_CREDENTIALS}"]
                     ]){
+                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
                         sh "kubectl apply -f argocd/prod/argocd-frontend-prod.yaml"
                     }                    
                 }
