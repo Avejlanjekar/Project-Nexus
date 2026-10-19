@@ -1,0 +1,351 @@
+
+pipeline{
+    agent any
+
+    environment{
+        AWS_CREDENTIALS= 'aws-ecr-credentials'
+        BUILD_CONTEXT='./backend'
+        BACKEND_IMAGE_DEV= 'avejlanjekar45/employee-management-backend-dev'
+        BACKEND_IMAGE_QA= 'avejlanjekar45/employee-management-backend-qa'
+        BACKEND_IMAGE_UAT='avejlanjekar45/employee-management-backend-uat'
+        BACKEND_IMAGE_PROD='avejlanjekar45/employee-management-backend-prod'
+        REGISTRY_URL= 'https://registry.hub.docker.com'
+        DEV_DH_CREDENTIALS= 'dockerhub-credentials'
+        QA_DH_CREDENTIALS= 'dockerhub-credentials'
+        UAT_DH_CREDENTIALS= 'dockerhub-credentials'
+        PROD_DH_CREDENTIALS= 'dockerhub-credentials'
+        AWS_REGION = 'ap-south-1'
+    }
+
+    parameters{
+        choice(
+            name: 'Environment',
+            choices: ["dev","qa","uat","prod"],
+            description: "Select deployment environment"
+        )
+
+        string(
+            name: 'IMAGE_TAG',
+            defaultValue: '',
+            description: 'provide commit id'
+        )
+        string(
+            name: 'REGISTER_ARGOCD_APPLICATION',
+            choices: ["yes","no"]
+            description: "register argocd application?"
+        )
+    }
+
+    stages{
+
+        stage("build & push"){
+            when {
+                expression{
+                    params.Environment == "dev"
+                }
+            }
+            steps{
+                script{
+                    buildAndPushImage("${env.BACKEND_IMAGE_DEV}","${env.DEV_DH_CREDENTIALS}","${env.BUILD_CONTEXT}")
+                }
+            }
+        }
+
+        stage('Update Dev Helm Values') {
+            when {
+                expression { params.Environment == 'dev' }
+            }
+            steps {
+                withEnv(["IMAGE_TAG=${GIT_COMMIT}"]) {
+                    sh '''
+                        yq -i '.backend.image.tag = strenv(IMAGE_TAG)' helm/employee-management/values-dev.yaml
+                    '''
+                }
+            }
+        }
+        
+        stage('Commit and Push DEV Helm Values') {
+            when {
+                expression { 
+                    params.Environment == 'dev' 
+                }
+            }
+            steps {
+                sh '''
+                    git config user.name "Avej Lanjekar"
+                    git config user.email "avejlanjekar@gmail.com"
+
+                    git add helm/employee-management/values-dev.yaml
+
+                    if ! git diff --cached --quiet; then
+                        git commit -m "Update backend Dev image tag"
+                    else
+                        echo "No changes in DEV Helm values. Skipping commit."
+                    fi
+                '''
+
+                withCredentials([gitUsernamePassword(
+                    credentialsId: 'github-git-credentials',
+                    gitToolName: 'Default'
+                )]) {
+                        sh 'git push origin HEAD:main'
+                }
+            }
+        }
+
+        stage('Register DEV Argocd Application'){
+            when{
+                expression{
+                    params.REGISTER_ARGOCD_APPLICATION == "yes"
+                }
+            }
+            steps{
+                script{                   
+                    sh "kubectl apply -f argocd/dev/argocd-backend-dev.yaml"
+                }
+            }
+        }
+
+        stage("promote image DEV to QA"){
+            when{
+                expression{
+                    params.Environment == "qa"
+                }
+            }
+            steps{
+                script{
+
+                    promoteImage("${env.BACKEND_IMAGE_DEV}","${env.BACKEND_IMAGE_QA}","${env.DEV_DH_CREDENTIALS}","${env.QA_DH_CREDENTIALS}")
+                }
+            }
+        }
+
+        stage('Update QA Helm Values') {
+            when {
+                expression { params.Environment == 'qa' }
+            }
+            steps {
+                sh '''
+                    yq -i '.backend.image.tag = strenv(IMAGE_TAG)' helm/employee-management/values-qa.yaml
+                '''
+            }
+        }
+        
+        stage('Commit and Push QA Helm Values') {
+            when {
+                expression { 
+                    params.Environment == 'qa' 
+                }
+            }
+            steps {
+                sh '''
+                    git config user.name "Avej Lanjekar"
+                    git config user.email "avejlanjekar@gmail.com"
+
+                    git add helm/employee-management/values-qa.yaml
+
+                    if ! git diff --cached --quiet; then
+                        git commit -m "Update backend QA image tag"
+                    else
+                        echo "No changes in QA Helm values. Skipping commit."
+                    fi
+                '''
+
+                withCredentials([gitUsernamePassword(
+                    credentialsId: 'github-git-credentials',
+                    gitToolName: 'Default'
+                )]) {
+                        sh 'git push origin HEAD:main'
+                }
+            }
+        }
+
+        stage('Register QA Argocd Application'){
+            when{
+                expression{
+                    params.REGISTER_ARGOCD_APPLICATION == "yes"
+                }
+            }
+            steps{
+                script{                   
+                    sh "kubectl apply -f argocd/qa/argocd-backend-qa.yaml"
+                }
+            }
+        }
+
+        stage("promote image QA to UAT"){
+            when {
+                expression{
+                    params.Environment == "uat"
+                }
+            }
+            steps{
+                script{
+
+                    promoteImage("${env.BACKEND_IMAGE_QA}","${env.BACKEND_IMAGE_UAT}", "${env.QA_DH_CREDENTIALS}","${env.UAT_DH_CREDENTIALS}")
+
+                }
+            }
+        }
+
+        stage('Update UAt Helm Values') {
+            when {
+                expression { params.Environment == 'uat' }
+            }
+            steps {
+                sh '''
+                    yq -i '.backend.image.tag = strenv(IMAGE_TAG)' helm/employee-management/values-uat.yaml
+                '''
+            }
+        }
+        
+        stage('Commit and Push UAT Helm Values') {
+            when {
+                expression { 
+                    params.Environment == 'uat' 
+                }
+            }
+            steps {
+                sh '''
+                    git config user.name "Avej Lanjekar"
+                    git config user.email "avejlanjekar@gmail.com"
+
+                    git add helm/employee-management/values-uat.yaml
+
+                    if ! git diff --cached --quiet; then
+                        git commit -m "Update backend UAT image tag"
+                    else
+                        echo "No changes in UAT Helm values. Skipping commit."
+                    fi
+                '''
+
+                withCredentials([gitUsernamePassword(
+                    credentialsId: 'github-git-credentials',
+                    gitToolName: 'Default'
+                )]) {
+                        sh 'git push origin HEAD:main'
+                }
+            }
+        }
+
+        stage('Register UAT Argocd Application'){
+            when{
+                expression{
+                    params.REGISTER_ARGOCD_APPLICATION == "yes"
+                }
+            }
+            steps{
+                script{                   
+                    sh "kubectl apply -f argocd/uat/argocd-backend-uat.yaml"
+                }
+            }
+        }
+
+        stage("approval for prod"){
+            when{
+                expression{
+                    params.Environment == 'prod'
+                }
+            }
+            steps{
+                input message: 'Promote the image from UAT to PROD?',
+                      ok: "Promote to PROD"
+            }
+        }
+        
+        stage("Promote image from UAT to PROD"){
+            when{
+                expression{
+                    params.Environment == "prod"
+                }
+            }
+            steps{
+                script{
+
+                    promoteImage("${env.BACKEND_IMAGE_UAT}","${env.BACKEND_IMAGE_PROD}","${env.UAT_DH_CREDENTIALS}","${env.PROD_DH_CREDENTIALS}")
+                }
+            }
+        }
+
+        stage('Update PROD Helm Values') {
+            when {
+                expression { params.Environment == 'prod' }
+            }
+            steps {
+                sh '''
+                    yq -i '.backend.image.tag = strenv(IMAGE_TAG)' helm/employee-management/values-prod.yaml
+                '''
+            }
+        }
+        
+        stage('Commit and Push PROD Helm Values') {
+            when {
+                expression { 
+                    params.Environment == 'prod' 
+                }
+            }
+            steps {
+                sh '''
+                    git config user.name "Avej Lanjekar"
+                    git config user.email "avejlanjekar@gmail.com"
+
+                    git add helm/employee-management/values-prod.yaml
+
+                    if ! git diff --cached --quiet; then
+                        git commit -m "Update backend PROD image tag"
+                    else
+                        echo "No changes in PROD Helm values. Skipping commit."
+                    fi
+                '''
+
+                withCredentials([gitUsernamePassword(
+                    credentialsId: 'github-git-credentials',
+                    gitToolName: 'Default'
+                )]) {
+                        sh 'git push origin HEAD:main'
+                }
+            }
+        }
+
+        stage('Register PROD Argocd Application'){
+            when{
+                expression{
+                    params.REGISTER_ARGOCD_APPLICATION == "yes"
+                }
+            }
+            steps{
+                script{                   
+                    sh "kubectl apply -f argocd/prod/argocd-backend-prod.yaml"
+                }
+            }
+        }
+    }
+    post{
+        always{
+            deleteDir()
+        }
+    }
+}
+
+def buildAndPushImage(String BACKEND_IMAGE, String DH_CREDENTIALS, String Buildcontext){
+    def backend= docker.build("${BACKEND_IMAGE}:${GIT_COMMIT}","${Buildcontext}")
+
+    docker.withRegistry("${env.REGISTRY_URL}","${DH_CREDENTIALS}"){
+        backend.push()
+    }
+}
+
+def promoteImage(String sourceImage, String targetImage, String source_DH_Credentials, String target_DH_Credentials){
+    if (!params.IMAGE_TAG?.trim()) {
+        error('IMAGE_TAG is required for image promotion.')
+    }
+    docker.withRegistry("${env.REGISTRY_URL}","${source_DH_Credentials}"){
+        docker.image("${sourceImage}:${params.IMAGE_TAG}").pull()
+    }
+
+    sh "docker tag ${sourceImage}:${params.IMAGE_TAG} ${targetImage}:${params.IMAGE_TAG}"
+
+    docker.withRegistry("${env.REGISTRY_URL}","${target_DH_Credentials}"){
+        docker.image("${targetImage}:${params.IMAGE_TAG}").push()
+    }
+}

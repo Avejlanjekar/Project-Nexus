@@ -1,0 +1,96 @@
+component: all
+
+global:
+  environment: dev
+
+frontend:
+  replicaCount: 1
+  containerName: frontend
+  deployment:
+    name: frontend-deployment
+  labels:
+    app: frontend
+  image:
+    repository: avejlanjekar45/employee-management-frontend
+    tag: "ff90cd9314e0990ca654c04d86c5cbea12f6b227"
+  containerPort: 80
+  service:
+    name: frontend-service
+    port: 80
+
+backend:
+  replicaCount: 1
+  containerName: backend
+  deployment:
+    name: backend-deployment
+  labels:
+    app: backend
+  image:
+    repository: avejlanjekar45/employee-management-backend
+    tag: "ff9ec4865e37da4f977a5daaf1a8e2dfe6c1533f"
+  containerPort: 5000
+  config:
+    configMapName: employee-cm
+    secretName: mysql-secret
+    DB_HOST: DB_HOST
+    DB_PORT: DB_PORT
+    DB_USER: DB_USER
+    DB_PASSWORD: DB_PASSWORD
+    DB_NAME: DB_NAME
+    env:
+      DB_HOST:
+        key: DB_HOST
+      DB_PORT:
+        key: DB_PORT
+      DB_USER:
+        key: MYSQL_USER
+      DB_PASSWORD:
+        key: MYSQL_PASSWORD
+      DB_NAME:
+        key: MYSQL_DATABASE
+  service:
+    name: backend
+    port: 5000
+
+database:
+  replicaCount: 1
+  containerName: mysql
+  deployment:
+    name: mysql-deployment
+  labels:
+    app: mysql
+  image:
+    repository: avejlanjekar45/employee-management-database
+    tag: "b9ecb584d01038d6ca4bc65248fdf5757d6c3fc6"
+  containerPort: 3306
+  env:
+    secretName: mysql-secret
+    MYSQL_ROOT_PASSWORD:
+      name: MYSQL_ROOT_PASSWORD
+      key: MYSQL_ROOT_PASSWORD
+    MYSQL_DATABASE:
+      name: MYSQL_DATABASE
+      key: MYSQL_DATABASE
+    MYSQL_USER:
+      name: MYSQL_USER
+      key: MYSQL_USER
+    MYSQL_PASSWORD:
+      name: MYSQL_PASSWORD
+      key: MYSQL_PASSWORD
+  service:
+    name: mysql
+    port: 3306
+
+configmap:
+  DB_HOST: mysql
+  DB_PORT: "3306"
+
+secret:
+  MYSQL_ROOT_PASSWORD: "cm9vdDEyMw=="
+  MYSQL_DATABASE: "ZW1wbG95ZWVfZGI="
+  MYSQL_USER: "ZW1wbG95ZWVfdXNlcg=="
+  MYSQL_PASSWORD: "ZW1wbG95ZWUxMjM="
+
+ingress:
+  className: alb
+  host: employee.com

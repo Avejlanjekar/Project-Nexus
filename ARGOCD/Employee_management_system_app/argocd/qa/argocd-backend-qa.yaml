@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: employee-management-backend-qa
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Avejlanjekar/employee-management-helm-cicd.git
+    targetRevision: main
+    path: helm/employee-management
+    helm:
+      valueFiles:
+        - values-qa.yaml
+      parameters:
+        - name: component
+          value: backend
+  destination:
+    server: https://C4D0C731063ED074CE90546C04497284.gr7.ap-south-1.eks.amazonaws.com
+    namespace: employee-qa
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

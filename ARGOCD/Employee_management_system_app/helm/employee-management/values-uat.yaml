@@ -1,0 +1,21 @@
+global:
+  environment: uat
+  imageTag: latest
+frontend:
+  replicaCount: 1
+  image:
+    repository: avejlanjekar45/employee-management-frontend
+    tag: "3a7ea9bebfdb185a2a33fddb72beeaeec92b942d"
+backend:
+  replicaCount: 1
+  image:
+    repository: avejlanjekar45/employee-management-backend
+    tag: "7785bd8ddbb87daad9810008b7601440310516ee"
+database:
+  replicaCount: 1
+  image:
+    repository: avejlanjekar45/employee-management-database
+    tag: "4e1e994c3ce6eed9dac189ed21f9ce970fda3bcb"
+ingress:
+  className: alb
+  host: employee-uat.com
