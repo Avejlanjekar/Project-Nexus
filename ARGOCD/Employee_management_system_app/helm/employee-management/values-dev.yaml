@@ -12,11 +12,11 @@ backend:
   image:
     repository: avejlanjekar45/employee-management-backend
     tag: "7785bd8ddbb87daad9810008b7601440310516ee"
-database:  
+database:
   replicaCount: 1
   image:
     repository: avejlanjekar45/employee-management-database
-    tag: "4e1e994c3ce6eed9dac189ed21f9ce970fda3bcb"
+    tag: "a84f30c4046055d85a36858bf668af4b7661a04e"
 ingress:
   enabled: true
   className: alb
