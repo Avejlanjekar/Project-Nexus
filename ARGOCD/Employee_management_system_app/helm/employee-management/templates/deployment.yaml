@@ -1,0 +1,84 @@
+{{- $root:= .}}
+{{- range $name:= list "backend" "frontend" "database"}}
+{{- $cfg := index $root.Values $name }}
+{{- if or (eq $root.Values.component "all") (eq $root.Values.component $name)}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $cfg.deployment.name }}
+spec:
+  replicas: {{ $cfg.replicaCount}}
+  selector:
+    matchLabels:
+      app: {{ $cfg.labels.app }}
+  template:
+    metadata:
+      labels:
+        app: {{ $cfg.labels.app }}
+    spec:
+      containers:
+        - name: {{ $cfg.containerName }}
+          image: "{{ $cfg.image.repository }}-{{ $root.Values.global.environment }}:{{ $cfg.image.tag }}"
+          ports:
+            - containerPort: {{ $cfg.containerPort }}
+          {{- if eq $name "backend" }}
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $cfg.config.configMapName}}
+                  key: {{ $cfg.config.env.DB_HOST.key}}
+
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $cfg.config.configMapName}}
+                  key: {{ $cfg.config.env.DB_PORT.key }}
+
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $cfg.config.secretName }}
+                  key: {{ $cfg.config.env.DB_USER.key}}
+
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $cfg.config.secretName}}
+                  key: {{ $cfg.config.env.DB_PASSWORD.key}}
+
+            - name: DB_NAME 
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $cfg.config.secretName}}
+                  key: {{ $cfg.config.env.DB_NAME.key}}
+
+          {{- else if eq $name "database"}}
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $cfg.env.secretName}}
+                  key: {{ $cfg.env.MYSQL_ROOT_PASSWORD.key}}
+
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $cfg.env.secretName}}
+                  key: {{ $cfg.env.MYSQL_DATABASE.key }}
+
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $cfg.env.secretName}}
+                  key: {{ $cfg.env.MYSQL_USER.key }}
+
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $cfg.env.secretName }}
+                  key: {{ $cfg.env.MYSQL_PASSWORD.key }}
+          {{- end}}
+---
+{{- end }}
+{{- end }}
