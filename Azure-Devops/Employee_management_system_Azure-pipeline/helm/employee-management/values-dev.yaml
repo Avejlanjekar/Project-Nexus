@@ -1,0 +1,23 @@
+
+global:
+  environment: dev
+  imageTag: latest
+frontend:
+  replicaCount: 1
+  image:
+    repository: avejlanjekar45/employee-management-frontend
+    tag: "1ef1a91242fe2d24c21efa9b23dd984b37adadcd"
+backend:
+  replicaCount: 1
+  image:
+    repository: avejlanjekar45/employee-management-backend
+    tag: "190884162a61e342f031f3bab187bb6f9020448b"
+database:
+  replicaCount: 1
+  image:
+    repository: avejlanjekar45/employee-management-database
+    tag: "e42f86d382ee192820c0e20afaa639af751d7d89"
+ingress:
+  enabled: true
+  className: alb
+  host: employee-dev.com

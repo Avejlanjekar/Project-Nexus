@@ -1,0 +1,22 @@
+global:
+  environment: qa
+  imageTag: latest
+frontend:
+  replicaCount: 1
+  image:
+    repository: avejlanjekar45/employee-management-frontend
+    tag: "420cb42837df2d6deb4ed42217abd1c7652b83fe"
+backend:
+  replicaCount: 1
+  image:
+    repository: avejlanjekar45/employee-management-backend
+    tag: "5f18a8dd05072b2ae1a91d59e9211862ff2204e6"
+database:
+  replicaCount: 1
+  image:
+    repository: avejlanjekar45/employee-management-database
+    tag: "52ad1ed755feadaa43ba45f9b602c4e673aa5323"
+ingress:
+  enabled: true
+  className: alb
+  host: employee-qa.com

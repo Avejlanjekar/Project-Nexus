@@ -1,0 +1,233 @@
+
+trigger: none
+
+pool:
+  name: Default
+
+parameters:
+  - name: Environment
+    type: string
+    default: dev
+    displayName: select Env for deployment
+    values:
+      - dev
+      - qa
+      - uat
+      - prod
+  
+  - name: imageTag
+    type: string
+    displayName: select Tag to promote
+    default: "latest"
+
+variables:
+  - group: employee-management-config
+
+stages:
+  - stage: Build_And_Push_Dev
+    displayName: 'Build and push database docker image to dev'
+    condition: eq('${{ parameters.Environment }}', 'dev')
+    jobs:
+      - job: Build_And_Push_Dev
+        displayName: 'Build and push database docker image to dev'
+        steps:
+          - checkout: self
+          - task: Docker@2
+            displayName: 'Build and push DB docker image'
+            inputs:
+              containerRegistry: 'dockerhub-service-connection'
+              repository: '$(dockerHubUsername)/employee-management-database-dev'
+              command: buildAndPush
+              Dockerfile: '$(databaseBuildContext)/Dockerfile'
+              buildContext: '$(databaseBuildContext)'
+              tags: |
+                $(Build.SourceVersion)
+
+  - stage: Deploy_Database_Dev
+    displayName: 'Deploy Database to dev env'
+    condition: eq('${{ parameters.Environment }}','dev')
+    dependsOn: [Build_And_Push_Dev]
+    jobs:
+      - job: DeployDatabaseDev 
+        displayName: 'Deploy database to employee-dev ns'
+        steps:
+          - checkout: self 
+          - script: |
+              set -e 
+
+              echo "Linting Helm chart ..."
+              helm lint ./helm/employee-management -f ./helm/employee-management/values-dev.yaml
+
+              echo "Deploying database to EKS"
+              helm upgrade --install employee-database-dev ./helm/employee-management --namespace $(devNamespace) \
+                --create-namespace \
+                -f ./helm/employee-management/values-dev.yaml \
+                --set component=database \
+                --set database.image.tag=$(Build.SourceVersion)
+
+              echo "waiting for database deployment..."
+              kubectl rollout status deployment/mysql-deployment --namespace $(devNamespace) --timeout=180s
+            displayName: 'Helm deploy database to Dev'
+
+  - stage: Promote_Dev_To_QA
+    displayName: 'QA - Promote database image'
+    dependsOn: []
+    condition: eq('${{ parameters.Environment }}', 'qa')
+    jobs:
+      - job: 'PromoteQA'
+        displayName: 'QA - Promote database image'
+        steps:
+          - checkout: none
+          - task: Docker@2
+            displayName: 'login to docker hub'
+            inputs:
+              command: 'login'
+              containerRegistry: 'dockerhub-service-connection'
+          - script: |
+              set -e
+
+              IMAGE_TAG='${{ parameters.imageTag }}'
+              if [ -z "$IMAGE_TAG" ] || [ "$IMAGE_TAG" = "latest" ]; then
+                echo "ERROR: Enter the actual image tag deployed to QA."
+                exit 1
+              fi 
+
+              docker pull $(dockerHubUsername)/employee-management-database-dev:${{ parameters.imageTag }}
+              docker tag $(dockerHubUsername)/employee-management-database-dev:${{ parameters.imageTag }} $(dockerHubUsername)/employee-management-database-qa:${{ parameters.imageTag }}
+              docker push $(dockerHubUsername)/employee-management-database-qa:${{ parameters.imageTag }}
+            displayName: "QA - Promote database image"
+
+  - stage: Deploy_Database_QA
+    displayName: 'Deploy Database to qa env'
+    dependsOn: [Promote_Dev_To_QA]
+    condition: eq('${{ parameters.Environment }}','qa')
+    jobs:
+      - job: Deploy_Database_QA
+        displayName: 'Deploy database to employee-qa ns'
+        steps:
+          - checkout: self
+          - script: |
+              set -e
+              
+              echo "Liniting Helm chart"
+              helm lint ./helm/employee-management -f ./helm/employee-management/values-qa.yaml 
+
+              echo "Deploying database to EKS employee-qa ns"
+
+              helm upgrade --install employee-database-qa ./helm/employee-management --namespace $(qaNamespace) \
+                --create-namespace \
+                -f ./helm/employee-management/values-qa.yaml \
+                --set component=database \
+                --set database.image.tag=${{ parameters.imageTag }}
+              kubectl rollout status deployment/mysql-deployment --namespace $(qaNamespace) --timeout=180s
+            displayName: 'Helm deploy database to QA'
+
+  - stage: Promote_QA_to_UAT
+    displayName: 'UAT - Promote database image'
+    dependsOn: []
+    condition: eq('${{ parameters.Environment }}','uat')
+    jobs:
+      - job: PromoteUAT
+        displayName: 'UAT - Promote database image'
+        steps:
+          - checkout: none
+          - task: Docker@2
+            displayName: 'login to docker hub'
+            inputs:
+              command: 'login'
+              containerRegistry: 'dockerhub-service-connection'
+          - script: |
+              set -e 
+
+              IMAGE_TAG='${{ parameters.imageTag }}'
+              if [ -z "$IMAGE_TAG" ] || [ "$IMAGE_TAG" = "latest" ]; then
+                echo "ERROR: Enter the actual image tag deployed to UAT."
+                exit 1
+              fi 
+
+              docker pull $(dockerHubUsername)/employee-management-database-qa:${{ parameters.imageTag }}
+              docker tag $(dockerHubUsername)/employee-management-database-qa:${{ parameters.imageTag }} $(dockerHubUsername)/employee-management-database-uat:${{ parameters.imageTag }}
+              docker push $(dockerHubUsername)/employee-management-database-uat:${{ parameters.imageTag }}
+            displayName: 'UAT - Promote database image'
+
+  - stage: Deploy_Database_UAT
+    displayName: 'Deploy Database to uat env'
+    dependsOn: [Promote_QA_to_UAT]
+    condition: eq('${{ parameters.Environment }}','uat')
+    jobs:
+      - job: Deploy_Database_UAT
+        displayName: 'Deploy database to employee-uat ns'
+        steps:
+          - checkout: self
+          - script: |
+              set -e
+              
+              echo "Liniting Helm chart"
+              helm lint ./helm/employee-management -f ./helm/employee-management/values-uat.yaml 
+
+              echo "Deploying database to EKS employee-uat ns"
+
+              helm upgrade --install employee-database-uat ./helm/employee-management --namespace $(uatNamespace) \
+                --create-namespace \
+                -f ./helm/employee-management/values-uat.yaml \
+                --set component=database \
+                --set database.image.tag=${{ parameters.imageTag }}
+              kubectl rollout status deployment/mysql-deployment --namespace $(uatNamespace) --timeout=180s
+            displayName: 'Helm deploy database to UAT'
+
+  - stage: Promote_UAT_to_PROD
+    displayName: 'promote uat to prod'
+    dependsOn: []
+    condition: eq('${{ parameters.Environment }}','prod')
+    jobs:
+      - deployment: PromotePROD
+        displayName: 'Approve and promote UAT image to Prod'
+        environment: 'employee-management-prod' 
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: none 
+                - task: Docker@2
+                  displayName: 'login to docker hub'
+                  inputs:
+                    command: 'login'
+                    containerRegistry: 'dockerhub-service-connection'
+                - script: |
+                    set -e 
+
+                    IMAGE_TAG='${{ parameters.imageTag }}'
+                    if [ -z "$IMAGE_TAG" ] || [ "$IMAGE_TAG" = "latest" ]; then
+                      echo "ERROR: Enter the actual image tag deployed to PROD."
+                      exit 1
+                    fi 
+
+                    docker pull $(dockerHubUsername)/employee-management-database-uat:${{ parameters.imageTag }}
+                    docker tag $(dockerHubUsername)/employee-management-database-uat:${{ parameters.imageTag }} $(dockerHubUsername)/employee-management-database-prod:${{ parameters.imageTag }}
+                    docker push $(dockerHubUsername)/employee-management-database-prod:${{ parameters.imageTag }}
+                  displayName: 'promote uat to prod'
+
+  - stage: Deploy_Database_PROD
+    displayName: 'Deploy Database to prod env'
+    dependsOn: [Promote_UAT_to_PROD]
+    condition: and(succeeded(), eq('${{ parameters.Environment }}', 'prod'))
+    jobs:
+      - job: Deploy_Database_PROD
+        displayName: 'Deploy database to employee-prod ns'
+        steps:
+          - checkout: self
+          - script: |
+              set -e
+              
+              echo "Liniting Helm chart"
+              helm lint ./helm/employee-management -f ./helm/employee-management/values-prod.yaml 
+
+              echo "Deploying database to EKS employee-prod ns"
+
+              helm upgrade --install employee-database-prod ./helm/employee-management --namespace $(prodNamespace) \
+                --create-namespace \
+                -f ./helm/employee-management/values-prod.yaml \
+                --set component=database \
+                --set database.image.tag=${{ parameters.imageTag }}
+              kubectl rollout status deployment/mysql-deployment --namespace $(prodNamespace) --timeout=180s
+            displayName: 'Helm deploy database to prod'
