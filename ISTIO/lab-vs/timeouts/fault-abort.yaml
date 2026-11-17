@@ -1,0 +1,19 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: slow-backend-fault
+  namespace: istio-demo
+spec:
+  hosts:
+    - slow-backend
+  http:
+    - fault:
+        abort:
+          percentage: 
+            value: 100
+          httpStatus: 500
+      route:
+        - destination:
+            host: slow-backend
+            port:
+              number: 80

@@ -1,0 +1,15 @@
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: backend-deny-frontend
+  namespace: istio-demo
+spec:
+  selector:
+    matchLabels:
+      app: backend
+  action: DENY
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/istio-demo/sa/frontend-sa

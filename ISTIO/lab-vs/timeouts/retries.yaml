@@ -1,0 +1,18 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: slow-backend
+  namespace: istio-demo
+spec:
+  hosts:
+    - slow-backend
+  http:
+    - timeout: 5s
+      retries:
+        attempts: 2
+        perTryTimeout: 2s
+      route:
+        - destination: 
+            host: slow-backend
+            port:
+              number: 80

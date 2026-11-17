@@ -1,0 +1,15 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: backend
+  namespace: istio-demo
+spec:
+  hosts:
+    - backend
+
+  http:
+    - route:
+        - destination:
+            host: backend
+            port:
+              number: 80

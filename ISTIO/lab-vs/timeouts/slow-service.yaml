@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: slow-backend
+  namespace: istio-demo
+spec:
+  selector:
+    app: slow-backend
+  ports:
+    - port: 80
+      targetPort: 80

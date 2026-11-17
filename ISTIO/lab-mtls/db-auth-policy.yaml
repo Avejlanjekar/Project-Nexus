@@ -1,0 +1,16 @@
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: db-allow-backend
+  namespace: istio-demo
+spec:
+  selector:
+    matchLabels:
+      app: db
+  action: ALLOW
+
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/istio-demo/sa/backend-sa
