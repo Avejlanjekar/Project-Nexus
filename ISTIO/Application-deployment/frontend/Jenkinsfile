@@ -28,17 +28,6 @@ pipeline{
             defaultValue: '',
             description: 'provide commit id'
         )
-        choice(
-            name: 'REGISTER_ARGOCD_APPLICATION',
-            choices: ["no","yes"],
-            description: "register argocd application?"
-        )
-
-         choice(
-            name: 'DELETE_ARGOCD_APPLICATION',
-            choices: ["no","yes"],
-            description: "delete argocd application?"
-        )
     }
 
     stages{
@@ -56,92 +45,24 @@ pipeline{
             }
         }
 
-        stage('Update Dev Helm Values') {
+        stage("Deploy DEV Frontend using Helm"){
             when {
-                expression { params.Environment == 'dev' }
-            }
-            steps {
-                withEnv(["IMAGE_TAG=${GIT_COMMIT}"]) {
-                    sh '''
-                        yq -i '.frontend.image.tag = strenv(IMAGE_TAG)' helm/employee-management/values-dev.yaml
-                    '''
-                }
-            }
-        }
- 
-        stage('Commit and Push DEV Helm Values') {
-            when {
-                expression { 
-                    params.Environment == 'dev' 
-                }
-            }
-            steps {
-                sh '''
-                    git config user.name "Avej Lanjekar"
-                    git config user.email "avejlanjekar@gmail.com"
-
-                    git add helm/employee-management/values-dev.yaml
-
-                    if ! git diff --cached --quiet; then
-                        git commit -m "Update frontend DEV image tag"
-                    else
-                        echo "No changes in DEV Helm values. Skipping commit."
-                    fi
-                '''
-
-                withCredentials([gitUsernamePassword(
-                    credentialsId: 'github-git-credentials',
-                    gitToolName: 'Default'
-                )]) {
-                        sh 'git push origin HEAD:main'
-                }
-            }
-        }
-
-        stage('Register DEV Argocd Application'){
-            when {
-                allOf {
-                    expression {
-                        params.Environment == 'dev' 
-                    }
-                    expression {
-                        params.REGISTER_ARGOCD_APPLICATION == 'yes' 
-                    }
+                expression {
+                    params.Environment == "dev"
                 }
             }
             steps{
                 script{
-                    withCredentials([
-                        [$class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: "${env.AWS_CREDENTIALS}"]
-                    ]){
-                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
-                        sh "kubectl apply -f argocd/dev/argocd-frontend-dev.yaml"
-                    }                 
-                }
-            }
-        }
-
-        stage('Delete DEV Argocd Application'){
-            when {
-                allOf {
-                    expression {
-                        params.Environment == 'dev' 
-                    }
-                    expression {
-                        params.DELETE_ARGOCD_APPLICATION == 'yes' 
-                    }
-                }
-            }
-            steps{
-                script{
-                    withCredentials([
-                        [$class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: "${env.AWS_CREDENTIALS}"]
-                    ]){
-                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
-                        sh "kubectl delete -f argocd/dev/argocd-frontend-dev.yaml"
-                    }                 
+                    sh """
+                        helm upgrade --install employee-management-frontend \
+                        helm/employee-management \
+                        -f helm/employee-management/values-dev.yaml \
+                        --namespace employee-dev \
+                        --create-namespace \
+                        --set component=frontend \
+                        --set frontend.image.repository=${env.FRONTEND_IMAGE_DEV} \
+                        --set frontend.image.tag=${env.GIT_COMMIT}
+                     """
                 }
             }
         }
@@ -159,90 +80,24 @@ pipeline{
             }
         }
 
-        stage('Update QA Helm Values') {
+        stage("Deploy QA Frontend using Helm"){
             when {
-                expression { params.Environment == 'qa' }
-            }
-            steps {   
-                sh '''
-                    yq -i '.frontend.image.tag = strenv(IMAGE_TAG)' helm/employee-management/values-qa.yaml
-                '''   
-            }
-        }
- 
-        stage('Commit and Push QA Helm Values') {
-            when {
-                expression { 
-                    params.Environment == 'qa' 
-                }
-            }
-            steps {
-                sh '''
-                    git config user.name "Avej Lanjekar"
-                    git config user.email "avejlanjekar@gmail.com"
-
-                    git add helm/employee-management/values-qa.yaml
-
-                    if ! git diff --cached --quiet; then
-                        git commit -m "Update frontend QA image tag"
-                    else
-                        echo "No changes in QA Helm values. Skipping commit."
-                    fi
-                '''
-
-                withCredentials([gitUsernamePassword(
-                    credentialsId: 'github-git-credentials',
-                    gitToolName: 'Default'
-                )]) {
-                        sh 'git push origin HEAD:main'
-                }
-            }
-        }
-
-        stage('Register QA Argocd Application'){
-            when {
-                allOf {
-                    expression {
-                        params.Environment == 'qa' 
-                    }
-                    expression {
-                        params.REGISTER_ARGOCD_APPLICATION == 'yes' 
-                    }
+                expression {
+                    params.Environment == "qa"
                 }
             }
             steps{
                 script{
-                    withCredentials([
-                        [$class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: "${env.AWS_CREDENTIALS}"]
-                    ]){
-                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
-                        sh "kubectl apply -f argocd/qa/argocd-frontend-qa.yaml"
-                    }                  
-                }
-            }
-        }
-
-        stage('Delete QA Argocd Application'){
-            when {
-                allOf {
-                    expression {
-                        params.Environment == 'qa' 
-                    }
-                    expression {
-                        params.DELETE_ARGOCD_APPLICATION == 'yes' 
-                    }
-                }
-            }
-            steps{
-                script{
-                    withCredentials([
-                        [$class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: "${env.AWS_CREDENTIALS}"]
-                    ]){
-                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
-                        sh "kubectl delete -f argocd/qa/argocd-frontend-qa.yaml"
-                    }                  
+                    sh """
+                        helm upgrade --install employee-management-frontend \
+                        helm/employee-management \
+                        -f helm/employee-management/values-qa.yaml \
+                        --namespace employee-qa \
+                        --create-namespace \
+                        --set component=frontend \
+                        --set frontend.image.repository=${env.FRONTEND_IMAGE_QA} \
+                        --set frontend.image.tag=${params.IMAGE_TAG}
+                     """
                 }
             }
         }
@@ -260,91 +115,24 @@ pipeline{
             }
         }
 
-        stage('Update UAT Helm Values') {
+        stage("Deploy UAT Frontend using Helm"){
             when {
-                expression { params.Environment == 'uat' }
-            }
-            steps {   
-                sh '''
-                    yq -i '.frontend.image.tag = strenv(IMAGE_TAG)' helm/employee-management/values-uat.yaml
-                '''   
-            }
-        }
- 
-        stage('Commit and Push UAT Helm Values') {
-            when {
-                expression { 
-                    params.Environment == 'uat' 
-                }
-            }
-            steps {
-                sh '''
-                    git config user.name "Avej Lanjekar"
-                    git config user.email "avejlanjekar@gmail.com"
-
-                    git add helm/employee-management/values-uat.yaml
-
-                    if ! git diff --cached --quiet; then
-                        git commit -m "Update frontend UAT image tag"
-                    else
-                        echo "No changes in Uat Helm values. Skipping commit."
-                    fi
-                
-                '''
-
-                withCredentials([gitUsernamePassword(
-                    credentialsId: 'github-git-credentials',
-                    gitToolName: 'Default'
-                )]) {
-                        sh 'git push origin HEAD:main'
-                }
-            }
-        }
-
-        stage('Register UAT Argocd Application'){
-            when {
-                allOf {
-                    expression {
-                        params.Environment == 'uat' 
-                    }
-                    expression {
-                        params.REGISTER_ARGOCD_APPLICATION == 'yes' 
-                    }
+                expression {
+                    params.Environment == "uat"
                 }
             }
             steps{
                 script{
-                    withCredentials([
-                        [$class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: "${env.AWS_CREDENTIALS}"]
-                    ]){
-                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
-                        sh "kubectl apply -f argocd/uat/argocd-frontend-uat.yaml"
-                    }                   
-                }
-            }
-        }
-
-        stage('Delete UAT Argocd Application'){
-            when {
-                allOf {
-                    expression {
-                        params.Environment == 'uat' 
-                    }
-                    expression {
-                        params.DELETE_ARGOCD_APPLICATION == 'yes' 
-                    }
-                }
-            }
-            steps{
-                script{
-                    withCredentials([
-                        [$class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: "${env.AWS_CREDENTIALS}"]
-                    ]){
-                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
-                        sh "kubectl delete -f argocd/uat/argocd-frontend-uat.yaml"
-                    }                   
+                    sh """
+                        helm upgrade --install employee-management-frontend \
+                        helm/employee-management \
+                        -f helm/employee-management/values-uat.yaml \
+                        --namespace employee-uat \
+                        --create-namespace \
+                        --set component=frontend \
+                        --set frontend.image.repository=${env.FRONTEND_IMAGE_UAT} \
+                        --set frontend.image.tag=${params.IMAGE_TAG}
+                     """
                 }
             }
         }
@@ -374,91 +162,24 @@ pipeline{
             }
         }
 
-        stage('Update PROD Helm Values') {
+        stage("Deploy PROD Frontend using Helm"){
             when {
-                expression { params.Environment == 'prod' }
-            }
-            steps {   
-                sh '''
-                    yq -i '.frontend.image.tag = strenv(IMAGE_TAG)' helm/employee-management/values-prod.yaml
-                '''   
-            }
-        }
- 
-        stage('Commit and Push PROD Helm Values') {
-            when {
-                expression { 
-                    params.Environment == 'prod' 
-                }
-            }
-            steps {
-                sh '''
-                    git config user.name "Avej Lanjekar"
-                    git config user.email "avejlanjekar@gmail.com"
-
-                    git add helm/employee-management/values-prod.yaml
-
-                    if ! git diff --cached --quiet; then
-                        git commit -m "Update frontend PROD image tag"
-                    else
-                        echo "No changes in PROD Helm values. Skipping commit."
-                    fi
-                
-                '''
-
-                withCredentials([gitUsernamePassword(
-                    credentialsId: 'github-git-credentials',
-                    gitToolName: 'Default'
-                )]) {
-                        sh 'git push origin HEAD:main'
-                }
-            }
-        }
-
-        stage('Register PROD Argocd Application'){
-            when {
-                allOf {
-                    expression {
-                        params.Environment == 'prod' 
-                    }
-                    expression {
-                        params.REGISTER_ARGOCD_APPLICATION == 'yes' 
-                    }
+                expression {
+                    params.Environment == "prod"
                 }
             }
             steps{
-                script{ 
-                    withCredentials([
-                        [$class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: "${env.AWS_CREDENTIALS}"]
-                    ]){
-                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
-                        sh "kubectl apply -f argocd/prod/argocd-frontend-prod.yaml"
-                    }                    
-                }
-            }
-        }
-
-        stage('Delete PROD Argocd Application'){
-            when {
-                allOf {
-                    expression {
-                        params.Environment == 'prod' 
-                    }
-                    expression {
-                        params.DELETE_ARGOCD_APPLICATION == 'yes' 
-                    }
-                }
-            }
-            steps{
-                script{ 
-                    withCredentials([
-                        [$class: 'AmazonWebServicesCredentialsBinding',
-                        credentialsId: "${env.AWS_CREDENTIALS}"]
-                    ]){
-                        sh "aws eks update-kubeconfig --name employee-management-eks-dev --region ap-south-1"
-                        sh "kubectl delete -f argocd/prod/argocd-frontend-prod.yaml"
-                    }                    
+                script{
+                    sh """
+                        helm upgrade --install employee-management-frontend \
+                        helm/employee-management \
+                        -f helm/employee-management/values-prod.yaml \
+                        --namespace employee-prod \
+                        --create-namespace \
+                        --set component=frontend \
+                        --set frontend.image.repository=${env.FRONTEND_IMAGE_PROD} \
+                        --set frontend.image.tag=${params.IMAGE_TAG}
+                     """
                 }
             }
         }
