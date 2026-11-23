@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: employee-management
+  namespace: employee-prod
+spec:
+  hosts:
+    - "employee-prod.local"
+  gateways:
+    - employee-management-gateway
+  http:
+    - route:
+        - destination:
+            host: frontend-service
+            port:
+              number: 80

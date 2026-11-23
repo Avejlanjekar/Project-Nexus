@@ -71,6 +71,7 @@ pipeline{
                         --set component=database \
                         --set database.image.repository=${env.DATABASE_IMAGE_DEV} \
                         --set database.image.tag=${env.GIT_COMMIT}
+
                      """
                 }
             }
