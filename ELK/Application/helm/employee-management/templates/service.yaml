@@ -1,0 +1,17 @@
+{{- $root:= .}}
+{{- range $name:= list "backend" "database" "frontend" }}
+{{- $cfg := index $root.Values $name}}
+{{- if or (eq $root.Values.component "all") (eq $root.Values.component $name)}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $cfg.service.name }}
+spec:
+  selector:
+    app: {{ $cfg.labels.app }}
+  ports:
+    - port: {{ $cfg.service.port }}
+      targetPort: {{ $cfg.containerPort }}
+---
+{{- end }}
+{{- end }}
